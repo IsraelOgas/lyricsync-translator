@@ -1,0 +1,39 @@
+# Build output
+dist/
+lyricsync
+lyricsync-translator
+
+# Dependencies
+web/node_modules/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Config (use env vars in Docker)
+config.yaml
+config.yml
+
+# Cache / Data
+.engram/
+*.db
+
+# Docker
+Dockerfile
+Dockerfile.dev
+docker-compose.yml
+docker-compose.dev.yml
+.dockerignore
+
+# Hot-reload artifacts
+tmp/

@@ -1,0 +1,58 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: lyricsync-backend-dev
+    working_dir: /app
+    command: air -c .air.toml
+    ports:
+      - "8090:8090"
+    environment:
+      - LYRIC_HOST=0.0.0.0
+      - LIBRETRANSLATE_URL=http://libretranslate:5000
+      - DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
+    volumes:
+      - .:/app
+      - /run/user/1000/bus:/run/user/1000/bus
+      - go_mod_cache:/go/pkg/mod
+    security_opt:
+      - apparmor:unconfined
+    depends_on:
+      libretranslate:
+        condition: service_started
+
+  frontend:
+    image: node:22-alpine
+    container_name: lyricsync-frontend-dev
+    working_dir: /app
+    command: >
+      sh -c "
+        corepack enable &&
+        corepack prepare pnpm@latest --activate &&
+        pnpm install --frozen-lockfile &&
+        pnpm dev --host 0.0.0.0
+      "
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./web:/app
+      - node_modules:/app/node_modules
+      - pnpm_store:/app/.pnpm-store
+    environment:
+      - VITE_API_TARGET=http://backend:8090
+      - CI=true
+    depends_on:
+      - backend
+
+  libretranslate:
+    image: libretranslate/libretranslate
+    container_name: libretranslate-dev
+    ports:
+      - "5000:5000"
+    command: --load-only en,es
+
+volumes:
+  go_mod_cache:
+  node_modules:
+  pnpm_store:

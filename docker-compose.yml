@@ -1,0 +1,29 @@
+services:
+  lyricsync:
+    build: .
+    container_name: lyricsync
+    ports:
+      - "8090:8090"
+    environment:
+      - LIBRETRANSLATE_URL=http://libretranslate:5000
+      - DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
+    volumes:
+      - /run/user/1000/bus:/run/user/1000/bus
+      - lyricsync_data:/data
+    security_opt:
+      - apparmor:unconfined
+    depends_on:
+      libretranslate:
+        condition: service_started
+    restart: unless-stopped
+
+  libretranslate:
+    image: libretranslate/libretranslate
+    container_name: libretranslate
+    ports:
+      - "5000:5000"
+    command: --load-only en,es
+    restart: unless-stopped
+
+volumes:
+  lyricsync_data:

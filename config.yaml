@@ -1,0 +1,29 @@
+# LyricsSync Translator — Configuration
+# Path: ~/.config/lyricsync/config.yaml or ./config.yaml
+
+server:
+  host: "127.0.0.1"
+  port: 8090
+
+player:
+  poll_interval_ms: 500          # How often to poll position (ms)
+  playerctl_path: "playerctl"    # Path to playerctl binary
+
+lyrics:
+  provider: "lrclib"             # Provider to use
+  lrclib:
+    base_url: "https://lrclib.net/api"
+    timeout_sec: 15
+
+translation:
+  provider: "libretranslate"
+  libretranslate:
+    base_url: "http://127.0.0.1:5000"
+    timeout_sec: 30
+    api_key: ""                      # Get one at https://libretranslate.com
+  romanization:
+    enabled: true
+    languages: ["ja", "zh", "ko"]  # ISO 639-1 codes
+
+cache:
+  db_path: "~/.lyricsync/cache.db"

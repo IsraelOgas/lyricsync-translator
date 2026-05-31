@@ -1,0 +1,1 @@
+{"root":["./src/App.tsx","./src/main.tsx","./src/types.ts","./src/vite-env.d.ts","./src/components/ErrorBoundary.tsx","./src/components/LyricsViewer.tsx","./src/components/NowPlayingBar.tsx","./src/hooks/usePlayerState.ts","./src/hooks/useSSE.ts"],"version":"5.9.3"}

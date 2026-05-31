@@ -1,0 +1,60 @@
+.bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  background: linear-gradient(180deg, var(--color-surface-alt) 0%, var(--color-surface-gradient) 100%);
+  border-bottom: 1px solid var(--color-border);
+  min-height: 60px;
+}
+
+.trackInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text-bright);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.artist {
+  font-size: 13px;
+  color: var(--color-primary);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.album {
+  font-size: 11px;
+  color: var(--color-text-dim);
+}
+
+.noTrack {
+  font-size: 14px;
+  color: var(--color-muted);
+}
+
+.status {
+  font-size: 11px;
+  color: var(--color-status);
+  padding: 4px 10px;
+  background: var(--color-status-bg);
+  border-radius: 12px;
+  text-transform: uppercase;
+}
+
+.skeletonBar {
+  width: 60%;
+  height: 20px;
+  border-radius: 4px;
+  background: var(--color-surface-highlight);
+  animation: lyricsync-pulse 1.5s ease-in-out infinite;
+}

@@ -1,0 +1,24 @@
+# Build output
+dist/
+
+# Go
+lyricsync-translator
+*.exe
+*.test
+*.out
+
+# Node / Vite
+node_modules/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# temporary files
+tmp/

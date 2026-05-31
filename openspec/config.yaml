@@ -1,0 +1,55 @@
+schema: spec-driven
+
+context: |
+  Backend: Go 1.26, chi v5, SQLite (modernc), playerctl/MPRIS, gopkg.in/yaml.v3
+  Frontend: React 18 + TypeScript 5.6 strict, Vite 6, pnpm
+  Architecture: monorepo, hexagonal-like (api/cache/config/lyrics/player/translate)
+  Comms: SSE for real-time track/lyric updates, async goroutine translation pipeline
+  External: LRCLib API (lyrics), LibreTranslate API, Google Translate (romanization)
+  No CI/CD, no Dockerfile, no .gitignore
+
+rules:
+  proposal:
+    - Include rollback plan for risky changes
+  specs:
+    - Use Given/When/Then for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+  design:
+    - Include sequence diagrams for complex flows
+    - Document architecture decisions with rationale
+  tasks:
+    - Group by phase, use hierarchical numbering
+    - Keep tasks completable in one session
+  apply:
+    - Follow existing code patterns
+    tdd: false
+    test_command: "go test ./..."
+  verify:
+    test_command: "go test ./..."
+    build_command: "go build ./cmd/lyricsync/ && cd web && pnpm build"
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive deltas
+
+testing:
+  strict_tdd: false
+  reason: "No test runner detected — no *_test.go files, no test scripts in web/package.json"
+  detected: "2026-05-30"
+
+  runner:
+    command: "go test ./..."
+    framework: "Go testing (stdlib)"
+
+  layers:
+    unit: false
+    integration: false
+    e2e: false
+
+  coverage:
+    available: false
+    command: "—"
+
+  quality:
+    linter: false
+    type_checker: "TypeScript strict mode enabled (frontend only)"
+    formatter: false

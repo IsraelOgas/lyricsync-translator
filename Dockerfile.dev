@@ -1,0 +1,15 @@
+FROM golang:1.26-alpine
+
+RUN apk add --no-cache playerctl dbus ca-certificates tzdata
+
+RUN go install github.com/air-verse/air@latest
+
+# Match host UID for D-Bus access
+RUN adduser -D -u 1000 dev
+
+WORKDIR /app
+
+ENV GOBIN=/go/bin
+ENV PATH=$GOBIN:$PATH
+
+USER dev

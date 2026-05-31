@@ -1,0 +1,51 @@
+:root {
+  --color-bg: #0a0a0a;
+  --color-surface: #111122;
+  --color-surface-alt: #1a1a2e;
+  --color-surface-highlight: #1a1a3a;
+  --color-surface-gradient: #16213e;
+  --color-border: #2a2a4a;
+  --color-text: #e0e0e0;
+  --color-text-bright: #ffffff;
+  --color-text-dim: #666688;
+  --color-primary: #8888cc;
+  --color-success: #55aa55;
+  --color-status: #44aa44;
+  --color-status-bg: #1a3a1a;
+  --color-muted: #555577;
+  --color-muted-alt: #444466;
+}
+
+@keyframes lyricsync-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes lyricsync-pulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.8; }
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-surface);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-muted);
+  border-radius: 4px;
+}
+
+* {
+  scrollbar-color: var(--color-muted) var(--color-surface);
+  scrollbar-width: thin;
+}
+
+.text-ellipsis {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
