@@ -11,7 +11,9 @@ export interface UsePlayerStateReturn {
   fetchingLyrics: boolean;
   translating: boolean;
   paused: boolean;
+  lyricsError: string | null;
   handleTogglePlayPause: () => void;
+  handleRetryLyrics: () => void;
 }
 
 export function usePlayerState(): UsePlayerStateReturn {
@@ -22,11 +24,18 @@ export function usePlayerState(): UsePlayerStateReturn {
   const [notFound, setNotFound] = useState(false);
   const [fetchingLyrics, setFetchingLyrics] = useState(false);
   const [translating, setTranslating] = useState(false);
+  const [lyricsError, setLyricsError] = useState<string | null>(null);
 
   // Derive paused from player status reported via SSE
   const paused = status !== 'playing';
 
   const handleTogglePlayPause = useCallback(() => {
+    fetch('/api/player/toggle', { method: 'POST' }).catch(() => {});
+  }, []);
+
+  const handleRetryLyrics = useCallback(() => {
+    setLyricsError(null);
+    setFetchingLyrics(true);
     fetch('/api/player/toggle', { method: 'POST' }).catch(() => {});
   }, []);
 
@@ -38,6 +47,7 @@ export function usePlayerState(): UsePlayerStateReturn {
           setLines([]);
           setNotFound(false);
           setFetchingLyrics(true);
+          setLyricsError(null);
         }
         break;
       case 'status':
@@ -51,9 +61,14 @@ export function usePlayerState(): UsePlayerStateReturn {
         break;
       case 'lyrics':
         setFetchingLyrics(false);
+        setLyricsError(null);
         setTranslating(!!event.translating);
         if (event.lines) setLines(event.lines);
         if (event.not_found) setNotFound(true);
+        break;
+      case 'lyrics_error':
+        setFetchingLyrics(false);
+        setLyricsError(event.error || 'Failed to load lyrics');
         break;
       case 'translations':
         setTranslating(false);
@@ -71,5 +86,5 @@ export function usePlayerState(): UsePlayerStateReturn {
 
   useSSE(handleEvent);
 
-  return { track, status, positionMs, lines, notFound, fetchingLyrics, translating, paused, handleTogglePlayPause };
+  return { track, status, positionMs, lines, notFound, fetchingLyrics, translating, paused, lyricsError, handleTogglePlayPause, handleRetryLyrics };
 }

@@ -49,7 +49,7 @@ func (s PlayerStatus) String() string {
 //
 // Returns an error if playerctl cannot be started (likely not installed).
 // The caller should receive StatusNoPlayer on the status channel in that case.
-func Start(playerctlPath string) (<-chan TrackInfo, <-chan PlayerStatus, <-chan int64, error) {
+func Start(playerctlPath string, activePlayer *string) (<-chan TrackInfo, <-chan PlayerStatus, <-chan int64, error) {
 	format := "{{artist}}||{{title}}||{{album}}||{{duration(mpris:length)}}||{{position}}||{{status}}||{{playerName}}"
 
 	cmd := exec.Command(playerctlPath, "--follow", "-a", "--format", format, "metadata", "position", "status")
@@ -73,7 +73,10 @@ func Start(playerctlPath string) (<-chan TrackInfo, <-chan PlayerStatus, <-chan 
 		defer close(statusCh)
 		defer close(posCh)
 
-		var activePlayer string // track which player we're following
+		var localActive string // track which player we're following
+		if activePlayer != nil {
+			*activePlayer = localActive
+		}
 
 		scanner := bufio.NewScanner(stdout)
 		for scanner.Scan() {
@@ -112,23 +115,32 @@ func Start(playerctlPath string) (<-chan TrackInfo, <-chan PlayerStatus, <-chan 
 
 			// When any player starts playing, switch active player to it.
 			if status == StatusPlaying && playerName != "" {
-				if activePlayer != playerName {
-					activePlayer = playerName
+				if localActive != playerName {
+					localActive = playerName
+					if activePlayer != nil {
+						*activePlayer = localActive
+					}
 				}
 			}
 
 			// If active player stopped, clear it so we can pick up another.
-			if playerName == activePlayer && status == StatusStopped {
-				activePlayer = ""
+			if playerName == localActive && status == StatusStopped {
+				localActive = ""
+				if activePlayer != nil {
+					*activePlayer = ""
+				}
 			}
 
 			// Adopt first player with content if nothing is active yet.
-			if activePlayer == "" && artist != "" && title != "" {
-				activePlayer = playerName
+			if localActive == "" && artist != "" && title != "" {
+				localActive = playerName
+				if activePlayer != nil {
+					*activePlayer = localActive
+				}
 			}
 
 			// Ignore events from players we are not tracking.
-			if playerName != activePlayer {
+			if playerName != localActive {
 				continue
 			}
 
@@ -174,21 +186,27 @@ func Start(playerctlPath string) (<-chan TrackInfo, <-chan PlayerStatus, <-chan 
 	return trackCh, statusCh, posCh, nil
 }
 
-// TogglePlayPause sends play-pause to the MPRIS player via playerctl.
-func TogglePlayPause(playerctlPath string) error {
-	cmd := exec.Command(playerctlPath, "play-pause")
+// TogglePlayPause sends play-pause to the given MPRIS player via playerctl.
+// If playerName is empty, toggles the first available player.
+func TogglePlayPause(playerctlPath string, playerName string) error {
+	args := []string{"play-pause"}
+	if playerName != "" {
+		args = append([]string{"-p", playerName}, args...)
+	}
+	cmd := exec.Command(playerctlPath, args...)
 	return cmd.Run()
 }
 
 // GetCurrentTrack queries playerctl for the currently playing track (one-shot).
 // With multiple players, it prioritizes: Playing > Paused > any track.
-func GetCurrentTrack(playerctlPath string) (*TrackInfo, PlayerStatus) {
+// Returns the player name, track info, and status.
+func GetCurrentTrack(playerctlPath string) (string, *TrackInfo, PlayerStatus) {
 	format := "{{artist}}||{{title}}||{{album}}||{{duration(mpris:length)}}||{{status}}||{{playerName}}"
 
 	cmd := exec.Command(playerctlPath, "-a", "--format", format, "metadata", "status")
 	out, err := cmd.Output()
 	if err != nil {
-		return nil, StatusNoPlayer
+		return "", nil, StatusNoPlayer
 	}
 
 	// There may be multiple lines (one per player).
@@ -196,8 +214,9 @@ func GetCurrentTrack(playerctlPath string) (*TrackInfo, PlayerStatus) {
 	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
 
 	type candidate struct {
-		track  TrackInfo
-		status PlayerStatus
+		playerName string
+		track      TrackInfo
+		status     PlayerStatus
 	}
 
 	var playing, paused, any *candidate
@@ -214,6 +233,7 @@ func GetCurrentTrack(playerctlPath string) (*TrackInfo, PlayerStatus) {
 
 		artist := parts[0]
 		title := parts[1]
+		playerName := parts[len(parts)-1]
 		statusStr := parts[len(parts)-2]
 		durStr := parts[len(parts)-3]
 		album := strings.Join(parts[2:len(parts)-3], "||")
@@ -240,6 +260,7 @@ func GetCurrentTrack(playerctlPath string) (*TrackInfo, PlayerStatus) {
 		}
 
 		c := &candidate{
+			playerName: playerName,
 			track: TrackInfo{
 				Artist:     artist,
 				Title:      title,
@@ -267,13 +288,13 @@ func GetCurrentTrack(playerctlPath string) (*TrackInfo, PlayerStatus) {
 
 	// Return best: Playing > Paused > first with any status
 	if playing != nil {
-		return &playing.track, playing.status
+		return playing.playerName, &playing.track, playing.status
 	}
 	if paused != nil {
-		return &paused.track, paused.status
+		return paused.playerName, &paused.track, paused.status
 	}
 	if any != nil {
-		return &any.track, any.status
+		return any.playerName, &any.track, any.status
 	}
 
 	// Fallback: try each player individually
@@ -281,10 +302,10 @@ func GetCurrentTrack(playerctlPath string) (*TrackInfo, PlayerStatus) {
 	for _, playerName := range players {
 		track, status := getPlayerTrack(playerctlPath, playerName)
 		if track != nil {
-			return track, status
+			return playerName, track, status
 		}
 	}
-	return nil, StatusNoPlayer
+	return "", nil, StatusNoPlayer
 }
 
 func getPlayerTrack(playerctlPath, playerName string) (*TrackInfo, PlayerStatus) {

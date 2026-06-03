@@ -9,9 +9,12 @@ interface Props {
   notFound?: boolean;
   fetchingLyrics?: boolean;
   translating?: boolean;
+  lyricsError?: string | null;
+  onRetry?: () => void;
+  showRomanization?: boolean;
 }
 
-export const LyricsViewer: React.FC<Props> = ({ lines, positionMs, paused, notFound, fetchingLyrics, translating }) => {
+export const LyricsViewer: React.FC<Props> = ({ lines, positionMs, paused, notFound, fetchingLyrics, translating, lyricsError, onRetry, showRomanization = true }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [activeIdx, setActiveIdx] = useState(-1);
 
@@ -55,17 +58,20 @@ export const LyricsViewer: React.FC<Props> = ({ lines, positionMs, paused, notFo
   }, [activeIdx, paused]);
 
   if (lines.length === 0) {
+    if (lyricsError && !fetchingLyrics) {
+      return (
+        <div className={styles.empty}>
+          <p className={styles.emptyText}>{lyricsError}</p>
+          <button className={styles.retryBtn} onClick={onRetry}>Retry</button>
+        </div>
+      );
+    }
+
     if (fetchingLyrics) {
       return (
         <div className={styles.empty}>
-          <div className={styles.skeletonLine} />
-          <div className={styles.skeletonLine} />
-          <div className={styles.skeletonLine} />
-          <div className={styles.skeletonLine} />
-          <div className={styles.skeletonLine} />
-          <div className={styles.skeletonLine} />
-          <div className={styles.skeletonLine} />
-          <div className={styles.skeletonLine} />
+          <div className={styles.spinner} />
+          <p className={styles.emptyText}>Loading lyrics...</p>
         </div>
       );
     }
@@ -102,7 +108,7 @@ export const LyricsViewer: React.FC<Props> = ({ lines, positionMs, paused, notFo
             className={`${styles.line} ${isActive ? styles.lineActive : styles.lineInactive}`}
           >
             <p className={styles.original}>{line.original}</p>
-            {line.romanized && (
+            {showRomanization !== false && line.romanized && (
               <p className={styles.romanized}>{line.romanized}</p>
             )}
             {line.translated && (

@@ -8,10 +8,11 @@ import (
 
 // Tracker combines MPRIS channels into a coherent state and emits events.
 type Tracker struct {
-	currentTrack *TrackInfo
-	status       PlayerStatus
-	positionMs   int64
-	playerctl    string
+	currentTrack  *TrackInfo
+	status        PlayerStatus
+	positionMs    int64
+	activePlayer  string
+	playerctl     string
 }
 
 // TrackerEvent is a JSON-serializable update sent to SSE clients.
@@ -35,7 +36,7 @@ func NewTracker(playerctlPath string) *Tracker {
 func (t *Tracker) Events(ctx context.Context) <-chan []byte {
 	out := make(chan []byte, 64)
 
-	trackCh, statusCh, posCh, err := Start(t.playerctl)
+	trackCh, statusCh, posCh, err := Start(t.playerctl, &t.activePlayer)
 	if err != nil {
 		go func() {
 			msg, _ := json.Marshal(TrackerEvent{
@@ -52,7 +53,8 @@ func (t *Tracker) Events(ctx context.Context) <-chan []byte {
 		defer close(out)
 
 		// Check if a track is already playing on startup
-		if initialTrack, initialStatus := GetCurrentTrack(t.playerctl); initialTrack != nil {
+		if playerName, initialTrack, initialStatus := GetCurrentTrack(t.playerctl); initialTrack != nil {
+			t.activePlayer = playerName
 			t.currentTrack = initialTrack
 			t.status = initialStatus
 			msg, _ := json.Marshal(TrackerEvent{
@@ -145,4 +147,9 @@ func (t *Tracker) GetStatus() PlayerStatus {
 // GetPositionMs returns the current position in milliseconds.
 func (t *Tracker) GetPositionMs() int64 {
 	return t.positionMs
+}
+
+// GetActivePlayer returns the name of the currently tracked MPRIS player.
+func (t *Tracker) GetActivePlayer() string {
+	return t.activePlayer
 }

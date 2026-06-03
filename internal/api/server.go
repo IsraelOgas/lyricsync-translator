@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -162,8 +163,19 @@ func (s *Server) resolveAndPublishLyrics(ctx context.Context, track *player.Trac
 
 	data, err := s.lyricsSvc.ResolveSong(ctx, track.Artist, track.Title, track.Album)
 	if err != nil {
-		log.Printf("Error resolving lyrics: %v", err)
-		return
+		log.Printf("Error resolving lyrics (attempt 1): %v — retrying in 1s", err)
+		time.Sleep(1 * time.Second)
+		data, err = s.lyricsSvc.ResolveSong(ctx, track.Artist, track.Title, track.Album)
+		if err != nil {
+			log.Printf("Error resolving lyrics (attempt 2): %v — giving up", err)
+			errorPayload, _ := json.Marshal(map[string]interface{}{
+				"type":  "lyrics_error",
+				"error": fmt.Sprintf("Failed to load lyrics: %v", err),
+				"retry": true,
+			})
+			s.sse.Publish(errorPayload)
+			return
+		}
 	}
 	if data == nil {
 		log.Printf("No lyrics found for: %s - %s", track.Artist, track.Title)
@@ -188,7 +200,7 @@ func (s *Server) resolveAndPublishLyrics(ctx context.Context, track *player.Trac
 }
 
 func (s *Server) handleTogglePlayPause(w http.ResponseWriter, r *http.Request) {
-	if err := player.TogglePlayPause(s.cfg.Player.PlayerctlPath); err != nil {
+	if err := player.TogglePlayPause(s.cfg.Player.PlayerctlPath, s.tracker.GetActivePlayer()); err != nil {
 		log.Printf("Error toggling play-pause: %v", err)
 		http.Error(w, `{"error":"failed to toggle"}`, http.StatusInternalServerError)
 		return

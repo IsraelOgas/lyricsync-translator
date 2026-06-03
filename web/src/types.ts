@@ -42,3 +42,16 @@ export interface LyricsEvent {
   not_found?: boolean;
   translating?: boolean;
 }
+
+export interface LyricsErrorEvent {
+  type: 'lyrics_error';
+  error: string;
+  retry: boolean;
+}
+
+export interface Settings {
+  fontSize: number;
+  showRomanization: boolean;
+}
+
+export const DEFAULT_SETTINGS: Settings = { fontSize: 22, showRomanization: true };

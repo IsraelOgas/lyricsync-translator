@@ -55,6 +55,6 @@
   width: 60%;
   height: 20px;
   border-radius: 4px;
-  background: var(--color-surface-highlight);
+  background: var(--color-muted);
   animation: lyricsync-pulse 1.5s ease-in-out infinite;
 }
