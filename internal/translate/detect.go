@@ -1,40 +1,33 @@
 package translate
 
-import "unicode"
+import (
+	"github.com/abadojack/whatlanggo"
+)
 
-// DetectLanguage returns an ISO 639-1 language code for the given text
-// based on Unicode character ranges. Returns "auto" if undetermined.
+// DetectLanguage returns an ISO 639-1 language code for the given text.
+// Uses whatlanggo for accurate detection of 84 languages.
 func DetectLanguage(text string) string {
-	hasHiragana := false
-	hasKatakana := false
-	hasKanji := false
-	hasHangul := false
-	hasHan := false
+	if text == "" {
+		return "auto"
+	}
+	info := whatlanggo.Detect(text)
+	lang := info.Lang.Iso6391()
+	if lang == "" || !info.IsReliable() {
+		return "auto"
+	}
+	// fmt.Printf("Detected language: %s (reliable: %t)\n", lang, info.IsReliable())
+	return lang
+}
 
+// isLatinOnly returns true if the text contains only ASCII/Latin characters.
+func isLatinOnly(text string) bool {
 	for _, r := range text {
-		switch {
-		case unicode.Is(unicode.Hiragana, r):
-			hasHiragana = true
-		case unicode.Is(unicode.Katakana, r):
-			hasKatakana = true
-		case r >= 0x4E00 && r <= 0x9FFF:
-			hasKanji = true
-			hasHan = true
-		case r >= 0xAC00 && r <= 0xD7AF:
-			hasHangul = true
-		case r >= 0x3400 && r <= 0x4DBF:
-			hasHan = true
+		if r > 0x024F { // beyond Latin Extended-B
+			if r >= 0x2000 && r <= 0x206F { // common punctuation
+				continue
+			}
+			return false
 		}
 	}
-
-	if hasHiragana || hasKatakana || hasKanji {
-		return "ja"
-	}
-	if hasHangul {
-		return "ko"
-	}
-	if hasHan {
-		return "zh"
-	}
-	return "auto"
+	return true
 }

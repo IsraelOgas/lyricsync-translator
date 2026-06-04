@@ -46,6 +46,7 @@ func (s *Store) Migrate() error {
 		title TEXT NOT NULL,
 		album TEXT,
 		duration_ms INTEGER,
+		offset_ms INTEGER NOT NULL DEFAULT 0,
 		source TEXT NOT NULL DEFAULT 'lrclib',
 		created_at TEXT NOT NULL DEFAULT (datetime('now'))
 	);
@@ -62,11 +63,25 @@ func (s *Store) Migrate() error {
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		lyric_line_id INTEGER NOT NULL REFERENCES lyric_lines(id),
 		romanized TEXT,
-		translated_es TEXT,
-		UNIQUE(lyric_line_id)
+		translated_text TEXT,
+		target_lang TEXT NOT NULL DEFAULT 'es',
+		UNIQUE(lyric_line_id, target_lang)
 	);`
-	_, err := s.db.Exec(schema)
-	return err
+	if _, err := s.db.Exec(schema); err != nil {
+		return err
+	}
+
+	// Migrations for existing databases (add columns that may be missing)
+	migrations := []string{
+		"ALTER TABLE songs ADD COLUMN offset_ms INTEGER NOT NULL DEFAULT 0",
+		"ALTER TABLE translations ADD COLUMN translated_text TEXT",
+		"ALTER TABLE translations ADD COLUMN target_lang TEXT NOT NULL DEFAULT 'es'",
+	}
+	for _, m := range migrations {
+		s.db.Exec(m) // ignore errors — column may already exist
+	}
+
+	return nil
 }
 
 func HashKey(artist, title, album string) string {
@@ -76,10 +91,10 @@ func HashKey(artist, title, album string) string {
 }
 
 func (s *Store) GetSongByHash(hashKey string) (*Song, error) {
-	row := s.db.QueryRow("SELECT id, hash_key, artist, title, album, duration_ms, source, created_at FROM songs WHERE hash_key = ?", hashKey)
+	row := s.db.QueryRow("SELECT id, hash_key, artist, title, album, duration_ms, offset_ms, source, created_at FROM songs WHERE hash_key = ?", hashKey)
 	var song Song
 	var createdAt string
-	err := row.Scan(&song.ID, &song.HashKey, &song.Artist, &song.Title, &song.Album, &song.DurationMs, &song.Source, &createdAt)
+	err := row.Scan(&song.ID, &song.HashKey, &song.Artist, &song.Title, &song.Album, &song.DurationMs, &song.OffsetMs, &song.Source, &createdAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -101,9 +116,9 @@ func (s *Store) SaveSong(song *Song) error {
 		song.Source = "lrclib"
 	}
 	_, err := s.db.Exec(
-		`INSERT OR REPLACE INTO songs (id, hash_key, artist, title, album, duration_ms, source, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-		song.ID, song.HashKey, song.Artist, song.Title, song.Album, song.DurationMs, song.Source,
+		`INSERT OR REPLACE INTO songs (id, hash_key, artist, title, album, duration_ms, offset_ms, source, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+		song.ID, song.HashKey, song.Artist, song.Title, song.Album, song.DurationMs, song.OffsetMs, song.Source,
 	)
 	return err
 }
@@ -144,9 +159,9 @@ func (s *Store) SaveLyricLines(songID string, lines []LyricLine) error {
 }
 
 func (s *Store) GetTranslation(lyricLineID int) (*Translation, error) {
-	row := s.db.QueryRow("SELECT id, lyric_line_id, romanized, translated_es FROM translations WHERE lyric_line_id = ?", lyricLineID)
+	row := s.db.QueryRow("SELECT id, lyric_line_id, romanized, translated_text, target_lang FROM translations WHERE lyric_line_id = ?", lyricLineID)
 	var t Translation
-	err := row.Scan(&t.ID, &t.LyricLineID, &t.Romanized, &t.TranslatedES)
+	err := row.Scan(&t.ID, &t.LyricLineID, &t.Romanized, &t.TranslatedText, &t.TargetLang)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -158,19 +173,19 @@ func (s *Store) GetTranslation(lyricLineID int) (*Translation, error) {
 
 func (s *Store) SaveTranslation(t *Translation) error {
 	_, err := s.db.Exec(
-		"INSERT OR REPLACE INTO translations (lyric_line_id, romanized, translated_es) VALUES (?, ?, ?)",
-		t.LyricLineID, t.Romanized, t.TranslatedES,
+		"INSERT OR REPLACE INTO translations (lyric_line_id, romanized, translated_text, target_lang) VALUES (?, ?, ?, ?)",
+		t.LyricLineID, t.Romanized, t.TranslatedText, t.TargetLang,
 	)
 	return err
 }
 
-func (s *Store) GetTranslationsBySong(songID string) (map[int]*Translation, error) {
+func (s *Store) GetTranslationsBySong(songID, targetLang string) (map[int]*Translation, error) {
 	rows, err := s.db.Query(`
-		SELECT t.id, t.lyric_line_id, t.romanized, t.translated_es
+		SELECT t.id, t.lyric_line_id, t.romanized, t.translated_text, t.target_lang
 		FROM translations t
 		JOIN lyric_lines l ON t.lyric_line_id = l.id
-		WHERE l.song_id = ?
-	`, songID)
+		WHERE l.song_id = ? AND t.target_lang = ?
+	`, songID, targetLang)
 	if err != nil {
 		return nil, err
 	}
@@ -179,11 +194,25 @@ func (s *Store) GetTranslationsBySong(songID string) (map[int]*Translation, erro
 	result := make(map[int]*Translation)
 	for rows.Next() {
 		var t Translation
-		err := rows.Scan(&t.ID, &t.LyricLineID, &t.Romanized, &t.TranslatedES)
+		err := rows.Scan(&t.ID, &t.LyricLineID, &t.Romanized, &t.TranslatedText, &t.TargetLang)
 		if err != nil {
 			return nil, err
 		}
 		result[t.LyricLineID] = &t
 	}
 	return result, rows.Err()
+}
+
+func (s *Store) GetSongOffset(hashKey string) (int, error) {
+	var offset int
+	err := s.db.QueryRow("SELECT offset_ms FROM songs WHERE hash_key = ?", hashKey).Scan(&offset)
+	if err == sql.ErrNoRows {
+		return 0, nil
+	}
+	return offset, err
+}
+
+func (s *Store) UpdateSongOffset(hashKey string, offsetMs int) error {
+	_, err := s.db.Exec("UPDATE songs SET offset_ms = ? WHERE hash_key = ?", offsetMs, hashKey)
+	return err
 }

@@ -2,6 +2,7 @@ export interface TrackInfo {
   artist: string;
   title: string;
   album?: string;
+  cover_art_url?: string;
   duration_ms: number;
 }
 
@@ -28,6 +29,7 @@ export interface SongInfo {
   title: string;
   album?: string;
   duration_ms?: number;
+  offset_ms: number;
   source: string;
 }
 
@@ -57,6 +59,7 @@ export interface Settings {
   theme: 'dark-purple' | 'dark-blue' | 'warm-amber' | 'minimal-mono';
   translationColor: string;
   romanizationColor: string;
+  targetLang: string;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -67,4 +70,5 @@ export const DEFAULT_SETTINGS: Settings = {
   theme: 'dark-purple',
   translationColor: '#55aa55',
   romanizationColor: '#8888cc',
+  targetLang: 'es',
 };

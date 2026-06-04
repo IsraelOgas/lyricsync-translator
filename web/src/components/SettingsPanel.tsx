@@ -23,6 +23,18 @@ const FONTS: { value: Settings['fontFamily']; label: string }[] = [
   { value: 'rounded', label: 'Rounded' },
 ];
 
+const LANGUAGES: { value: string; label: string }[] = [
+  { value: 'es', label: 'Español' },
+  { value: 'en', label: 'English' },
+  { value: 'pt', label: 'Português' },
+  { value: 'fr', label: 'Français' },
+  { value: 'de', label: 'Deutsch' },
+  { value: 'it', label: 'Italiano' },
+  { value: 'ja', label: '日本語' },
+  { value: 'ko', label: '한국어' },
+  { value: 'zh', label: '中文' },
+];
+
 export const SettingsPanel: React.FC<Props> = ({ isOpen, settings, onUpdateSetting, onClose }) => {
   if (!isOpen) return null;
 
@@ -66,6 +78,22 @@ export const SettingsPanel: React.FC<Props> = ({ isOpen, settings, onUpdateSetti
                   onClick={() => onUpdateSetting('fontFamily', f.value)}
                 >
                   {f.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Target Language */}
+          <div className={styles.field}>
+            <label className={styles.label}>Translate to</label>
+            <div className={styles.chipRow}>
+              {LANGUAGES.map(l => (
+                <button
+                  key={l.value}
+                  className={`${styles.chip} ${settings.targetLang === l.value ? styles.chipActive : ''}`}
+                  onClick={() => onUpdateSetting('targetLang', l.value)}
+                >
+                  {l.label}
                 </button>
               ))}
             </div>

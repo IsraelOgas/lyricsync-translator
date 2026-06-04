@@ -21,6 +21,7 @@ function loadFromStorage(): Settings {
       theme: ['dark-purple', 'dark-blue', 'warm-amber', 'minimal-mono'].includes(parsed.theme) ? parsed.theme : DEFAULT_SETTINGS.theme,
       translationColor: typeof parsed.translationColor === 'string' ? parsed.translationColor : DEFAULT_SETTINGS.translationColor,
       romanizationColor: typeof parsed.romanizationColor === 'string' ? parsed.romanizationColor : DEFAULT_SETTINGS.romanizationColor,
+      targetLang: typeof parsed.targetLang === 'string' ? parsed.targetLang : DEFAULT_SETTINGS.targetLang,
     };
   } catch {
     return DEFAULT_SETTINGS;
@@ -67,6 +68,16 @@ export function useSettings(): UseSettingsReturn {
     setSettings(prev => {
       const next = { ...prev, [key]: value };
       saveToStorage(next);
+
+      // Sync target language to backend
+      if (key === 'targetLang') {
+        fetch('/api/config', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ target_lang: value }),
+        }).catch(() => {}); // non-blocking — backend will use default if unreachable
+      }
+
       return next;
     });
   }, []);

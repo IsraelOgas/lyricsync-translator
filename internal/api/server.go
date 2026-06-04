@@ -57,7 +57,8 @@ func NewServer(
 			log.Printf("OnUpdate: error getting lines: %v", err)
 			return
 		}
-		translations, err := store.GetTranslationsBySong(songID)
+		targetLang := tranSvc.TargetLang()
+		translations, err := store.GetTranslationsBySong(songID, targetLang)
 		if err != nil {
 			log.Printf("OnUpdate: error getting translations: %v", err)
 			return
@@ -80,7 +81,7 @@ func NewServer(
 			ld[i] = lineData{ID: l.ID, TimeMs: l.TimeMs, Original: l.Original}
 			if t, ok := translations[l.ID]; ok {
 				ld[i].Romanized = t.Romanized
-				ld[i].Translated = t.TranslatedES
+				ld[i].Translated = t.TranslatedText
 			}
 		}
 		payload, _ := json.Marshal(updateEvent{Type: "translations", Lines: ld})
@@ -95,6 +96,8 @@ func NewServer(
 	r.Get("/api/lyrics/stream", s.handleSSE)
 	r.Get("/api/config", s.handleGetConfig)
 	r.Put("/api/config", s.handleUpdateConfig)
+	r.Get("/api/songs/{hash}/offset", s.handleGetOffset)
+	r.Put("/api/songs/{hash}/offset", s.handleUpdateOffset)
 	r.Post("/api/player/toggle", s.handleTogglePlayPause)
 
 	// Serve frontend static files in production

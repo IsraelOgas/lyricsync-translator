@@ -17,6 +17,7 @@ lyrics:
 
 translation:
   provider: "deepseek"        # "libretranslate" or "deepseek"
+  target_lang: "es"                 # ISO 639-1: es, en, pt, fr, de, it, ja, ko, zh
   libretranslate:
     base_url: "http://127.0.0.1:5000"
     timeout_sec: 30

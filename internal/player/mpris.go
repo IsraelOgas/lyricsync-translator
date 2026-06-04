@@ -10,10 +10,11 @@ import (
 
 // TrackInfo holds metadata about the currently playing track.
 type TrackInfo struct {
-	Artist     string `json:"artist"`
-	Title      string `json:"title"`
-	Album      string `json:"album,omitempty"`
-	DurationMs int    `json:"duration_ms"`
+	Artist      string `json:"artist"`
+	Title       string `json:"title"`
+	Album       string `json:"album,omitempty"`
+	CoverArtURL string `json:"cover_art_url,omitempty"`
+	DurationMs  int    `json:"duration_ms"`
 }
 
 // PlayerStatus represents the player state.
@@ -50,7 +51,7 @@ func (s PlayerStatus) String() string {
 // Returns an error if playerctl cannot be started (likely not installed).
 // The caller should receive StatusNoPlayer on the status channel in that case.
 func Start(playerctlPath string, activePlayer *string) (<-chan TrackInfo, <-chan PlayerStatus, <-chan int64, error) {
-	format := "{{artist}}||{{title}}||{{album}}||{{duration(mpris:length)}}||{{position}}||{{status}}||{{playerName}}"
+	format := "{{artist}}||{{title}}||{{album}}||{{duration(mpris:length)}}||{{position}}||{{status}}||{{playerName}}||{{mpris:artUrl}}"
 
 	cmd := exec.Command(playerctlPath, "--follow", "-a", "--format", format, "metadata", "position", "status")
 
@@ -82,17 +83,18 @@ func Start(playerctlPath string, activePlayer *string) (<-chan TrackInfo, <-chan
 		for scanner.Scan() {
 			line := scanner.Text()
 			parts := strings.Split(line, "||")
-			if len(parts) < 7 {
+			if len(parts) < 8 {
 				continue
 			}
 
 			artist := parts[0]
 			title := parts[1]
-			playerName := parts[len(parts)-1]
-			statusStr := parts[len(parts)-2]
-			posStr := parts[len(parts)-3]
-			durStr := parts[len(parts)-4]
-			album := strings.Join(parts[2:len(parts)-4], "||")
+			artUrl := parts[len(parts)-1]
+			playerName := parts[len(parts)-2]
+			statusStr := parts[len(parts)-3]
+			posStr := parts[len(parts)-4]
+			durStr := parts[len(parts)-5]
+			album := strings.Join(parts[2:len(parts)-5], "||")
 
 			// Duration
 			durationMs := 0
@@ -157,10 +159,11 @@ func Start(playerctlPath string, activePlayer *string) (<-chan TrackInfo, <-chan
 			// Track info
 			if artist != "" && title != "" {
 				trackCh <- TrackInfo{
-					Artist:     artist,
-					Title:      title,
-					Album:      album,
-					DurationMs: durationMs,
+					Artist:      artist,
+					Title:       title,
+					Album:       album,
+					CoverArtURL: artUrl,
+					DurationMs:  durationMs,
 				}
 			}
 
@@ -198,10 +201,8 @@ func TogglePlayPause(playerctlPath string, playerName string) error {
 }
 
 // GetCurrentTrack queries playerctl for the currently playing track (one-shot).
-// With multiple players, it prioritizes: Playing > Paused > any track.
-// Returns the player name, track info, and status.
 func GetCurrentTrack(playerctlPath string) (string, *TrackInfo, PlayerStatus) {
-	format := "{{artist}}||{{title}}||{{album}}||{{duration(mpris:length)}}||{{status}}||{{playerName}}"
+	format := "{{artist}}||{{title}}||{{album}}||{{duration(mpris:length)}}||{{status}}||{{playerName}}||{{mpris:artUrl}}"
 
 	cmd := exec.Command(playerctlPath, "-a", "--format", format, "metadata", "status")
 	out, err := cmd.Output()
@@ -227,16 +228,17 @@ func GetCurrentTrack(playerctlPath string) (string, *TrackInfo, PlayerStatus) {
 			continue
 		}
 		parts := strings.Split(line, "||")
-		if len(parts) < 6 {
+		if len(parts) < 7 {
 			continue
 		}
 
 		artist := parts[0]
 		title := parts[1]
-		playerName := parts[len(parts)-1]
-		statusStr := parts[len(parts)-2]
-		durStr := parts[len(parts)-3]
-		album := strings.Join(parts[2:len(parts)-3], "||")
+		artUrl := parts[len(parts)-1]
+		playerName := parts[len(parts)-2]
+		statusStr := parts[len(parts)-3]
+		durStr := parts[len(parts)-4]
+		album := strings.Join(parts[2:len(parts)-4], "||")
 
 		if artist == "" && title == "" {
 			continue
@@ -262,10 +264,11 @@ func GetCurrentTrack(playerctlPath string) (string, *TrackInfo, PlayerStatus) {
 		c := &candidate{
 			playerName: playerName,
 			track: TrackInfo{
-				Artist:     artist,
-				Title:      title,
-				Album:      album,
-				DurationMs: durationMs,
+				Artist:      artist,
+				Title:       title,
+				Album:       album,
+				CoverArtURL: artUrl,
+				DurationMs:  durationMs,
 			},
 			status: status,
 		}
@@ -309,7 +312,7 @@ func GetCurrentTrack(playerctlPath string) (string, *TrackInfo, PlayerStatus) {
 }
 
 func getPlayerTrack(playerctlPath, playerName string) (*TrackInfo, PlayerStatus) {
-	format := "{{artist}}||{{title}}||{{album}}||{{duration(mpris:length)}}||{{status}}||{{playerName}}"
+	format := "{{artist}}||{{title}}||{{album}}||{{duration(mpris:length)}}||{{status}}||{{playerName}}||{{mpris:artUrl}}"
 	cmd := exec.Command(playerctlPath, "-p", playerName, "--format", format, "metadata", "status")
 	out, err := cmd.Output()
 	if err != nil {
@@ -323,15 +326,17 @@ func getPlayerTrack(playerctlPath, playerName string) (*TrackInfo, PlayerStatus)
 			continue
 		}
 		parts := strings.Split(line, "||")
-		if len(parts) < 6 {
+		if len(parts) < 7 {
 			continue
 		}
 
 		artist := parts[0]
 		title := parts[1]
-		statusStr := parts[len(parts)-2]
-		durStr := parts[len(parts)-3]
-		album := strings.Join(parts[2:len(parts)-3], "||")
+		artUrl := parts[len(parts)-1]
+		_ = parts[len(parts)-2] // playerName — unused here, param already known
+		statusStr := parts[len(parts)-3]
+		durStr := parts[len(parts)-4]
+		album := strings.Join(parts[2:len(parts)-4], "||")
 
 		if artist == "" && title == "" {
 			continue
@@ -355,10 +360,11 @@ func getPlayerTrack(playerctlPath, playerName string) (*TrackInfo, PlayerStatus)
 		}
 
 		return &TrackInfo{
-			Artist:     artist,
-			Title:      title,
-			Album:      album,
-			DurationMs: durationMs,
+			Artist:      artist,
+			Title:       title,
+			Album:       album,
+			CoverArtURL: artUrl,
+			DurationMs:  durationMs,
 		}, status
 	}
 	return nil, StatusNoPlayer

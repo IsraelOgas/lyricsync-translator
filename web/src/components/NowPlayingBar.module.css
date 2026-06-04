@@ -6,6 +6,16 @@
   background: linear-gradient(180deg, var(--color-surface-alt) 0%, var(--color-surface-gradient) 100%);
   border-bottom: 1px solid var(--color-border);
   min-height: 60px;
+  gap: 14px;
+}
+
+.cover {
+  width: 48px;
+  height: 48px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
 
 .trackInfo {

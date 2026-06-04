@@ -41,7 +41,7 @@ func (s *Server) handleGetLyrics(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	translations, err := s.store.GetTranslationsBySong(song.ID)
+	translations, err := s.store.GetTranslationsBySong(song.ID, s.tranSvc.TargetLang())
 	if err != nil {
 		http.Error(w, "database error", http.StatusInternalServerError)
 		return
@@ -64,7 +64,7 @@ func (s *Server) handleGetLyrics(w http.ResponseWriter, r *http.Request) {
 		}
 		if t, ok := translations[l.ID]; ok {
 			lr.Romanized = t.Romanized
-			lr.Translated = t.TranslatedES
+			lr.Translated = t.TranslatedText
 		}
 		responseLines = append(responseLines, lr)
 	}
@@ -84,5 +84,47 @@ func (s *Server) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, "config update not implemented in MVP", http.StatusNotImplemented)
+	var body struct {
+		TargetLang *string `json:"target_lang"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, `{"error":"invalid json"}`, http.StatusBadRequest)
+		return
+	}
+	if body.TargetLang != nil && *body.TargetLang != "" {
+		s.tranSvc.SetTargetLang(*body.TargetLang)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"target_lang": s.tranSvc.TargetLang(),
+	})
+}
+
+func (s *Server) handleGetOffset(w http.ResponseWriter, r *http.Request) {
+	hash := chi.URLParam(r, "hash")
+	offset, err := s.store.GetSongOffset(hash)
+	if err != nil {
+		http.Error(w, `{"error":"database error"}`, http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]int{"offset_ms": offset})
+}
+
+func (s *Server) handleUpdateOffset(w http.ResponseWriter, r *http.Request) {
+	hash := chi.URLParam(r, "hash")
+	var body struct {
+		OffsetMs int `json:"offset_ms"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, `{"error":"invalid json"}`, http.StatusBadRequest)
+		return
+	}
+	if err := s.store.UpdateSongOffset(hash, body.OffsetMs); err != nil {
+		http.Error(w, `{"error":"database error"}`, http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]int{"offset_ms": body.OffsetMs})
 }

@@ -3,6 +3,7 @@ module github.com/imov/lyricsync-translator
 go 1.26.3
 
 require (
+	github.com/abadojack/whatlanggo v1.0.1
 	github.com/go-chi/chi/v5 v5.3.0
 	github.com/google/uuid v1.6.0
 	github.com/joho/godotenv v1.5.1

@@ -8,7 +8,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import styles from './App.module.css';
 
 const App: React.FC = () => {
-  const { track, status, positionMs, lines, notFound, fetchingLyrics, translating, paused, lyricsError, handleTogglePlayPause, handleRetryLyrics } = usePlayerState();
+  const { track, status, positionMs, lines, notFound, fetchingLyrics, translating, paused, lyricsError, offsetMs, handleTogglePlayPause, handleRetryLyrics, handleUpdateOffset } = usePlayerState();
   const { settings, updateSetting } = useSettings();
   const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -25,12 +25,14 @@ const App: React.FC = () => {
         <LyricsViewer
           lines={lines}
           positionMs={positionMs}
+          offsetMs={offsetMs}
           paused={paused}
           notFound={notFound}
           fetchingLyrics={fetchingLyrics}
           translating={translating}
           lyricsError={lyricsError}
           onRetry={handleRetryLyrics}
+          onUpdateOffset={handleUpdateOffset}
           showRomanization={settings.showRomanization}
         />
         <footer className={styles.footer}>

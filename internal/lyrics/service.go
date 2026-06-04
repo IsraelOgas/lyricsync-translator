@@ -38,7 +38,8 @@ func (s *Service) ResolveSong(ctx context.Context, artist, title, album string) 
 
 	if song != nil {
 		lines, _ := s.store.GetLyricLines(song.ID)
-		translations, _ := s.store.GetTranslationsBySong(song.ID)
+		targetLang := s.tranSvc.TargetLang()
+		translations, _ := s.store.GetTranslationsBySong(song.ID, targetLang)
 
 		// Retry translation if any lines are missing translations
 		var missingTexts []string
@@ -124,9 +125,10 @@ func (s *Service) translateLines(ctx context.Context, storedLines []cache.LyricL
 			break
 		}
 		t := &cache.Translation{
-			LyricLineID:  storedLines[i].ID,
-			Romanized:    r.Romanized,
-			TranslatedES: r.Translated,
+			LyricLineID:    storedLines[i].ID,
+			Romanized:      r.Romanized,
+			TranslatedText: r.Translated,
+			TargetLang:     s.tranSvc.TargetLang(),
 		}
 		if err := s.store.SaveTranslation(t); err != nil {
 			log.Printf("Error saving translation for line %d: %v", i, err)
@@ -154,6 +156,7 @@ type SongInfo struct {
 	Title      string `json:"title"`
 	Album      string `json:"album,omitempty"`
 	DurationMs int    `json:"duration_ms,omitempty"`
+	OffsetMs   int    `json:"offset_ms"`
 	Source     string `json:"source"`
 }
 
@@ -177,6 +180,7 @@ func buildSongData(song *cache.Song, lines []cache.LyricLine, translations map[i
 			Title:      song.Title,
 			Album:      song.Album,
 			DurationMs: song.DurationMs,
+			OffsetMs:   song.OffsetMs,
 			Source:     song.Source,
 		},
 		Lines: make([]LineData, len(lines)),
@@ -191,7 +195,7 @@ func buildSongData(song *cache.Song, lines []cache.LyricLine, translations map[i
 		if translations != nil {
 			if t, ok := translations[l.ID]; ok {
 				ld.Romanized = t.Romanized
-				ld.Translated = t.TranslatedES
+				ld.Translated = t.TranslatedText
 			}
 		}
 		data.Lines[i] = ld

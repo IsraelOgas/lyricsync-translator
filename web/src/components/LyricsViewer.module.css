@@ -35,6 +35,65 @@
   letter-spacing: 2px;
 }
 
+.offsetBar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 8px 16px;
+  opacity: 0.5;
+  transition: opacity 0.2s ease;
+}
+
+.offsetBar:hover {
+  opacity: 1;
+}
+
+.offsetLabel {
+  font-size: 11px;
+  color: var(--color-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.offsetSlider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 140px;
+  height: 4px;
+  background: var(--color-surface-highlight);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+.offsetSlider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  background: var(--color-primary);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.offsetSlider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  background: var(--color-primary);
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+}
+
+.offsetValue {
+  font-size: 11px;
+  color: var(--color-text-dim);
+  font-family: monospace;
+  min-width: 40px;
+  text-align: left;
+}
+
 .line {
   text-align: center;
   padding: 12px 20px;
@@ -57,6 +116,20 @@
   color: var(--color-text-bright);
   margin: 0;
   overflow-wrap: break-word;
+}
+
+.karaoke {
+  background: linear-gradient(
+    to right,
+    var(--color-text-bright) 0%,
+    var(--color-text-bright) calc(var(--karaoke-progress, 0) * 100%),
+    var(--color-muted) calc(var(--karaoke-progress, 0) * 100%),
+    var(--color-muted) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  transition: background 0.15s linear;
 }
 
 .romanized {

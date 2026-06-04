@@ -77,11 +77,12 @@ func (c *DeepSeekClient) TranslateBatch(lines []string, source, target string) (
 
 	n := len(lines)
 	systemPrompt := fmt.Sprintf(
-		"You are a song lyric translator. For each numbered line do two things:\n"+
-			"1. Romanize it: transliterate non-Latin scripts (Japanese, Chinese, Korean, Cyrillic, etc.) to ASCII/Latin alphabet.\n"+
-			"2. Translate it to %s preserving metaphor, tone, cultural references, and poetic flow.\n"+
-			"Return ONLY a JSON object with \"romanized\" and \"translations\" arrays, each containing exactly %d strings. "+
-			`Example: {"romanized": ["konnichiha", "sekai"], "translations": ["hola", "mundo"]}`,
+		"You translate song lyrics. For each numbered line: "+
+			"romanize non-Latin text to ASCII (Hepburn for Japanese, Pinyin for Chinese). "+
+			"Keep Latin text unchanged in romanized. "+
+			"Translate to %s. "+
+			"Return JSON with romanized and translations arrays, each with %d strings. "+
+			`Example: {"romanized":["konnichiha","hello"],"translations":["hola","hola"]}`,
 		target, n,
 	)
 
@@ -93,7 +94,7 @@ func (c *DeepSeekClient) TranslateBatch(lines []string, source, target string) (
 			{Role: "system", Content: systemPrompt},
 			{Role: "user", Content: userPrompt},
 		},
-		Temperature:    0.3,
+		Temperature:    0.1,
 		MaxTokens:      16384,
 		ResponseFormat: &deepseekResponseFormat{Type: "json_object"},
 	}
@@ -144,6 +145,14 @@ func (c *DeepSeekClient) TranslateBatch(lines []string, source, target string) (
 		batchResp.Translations = padTo(batchResp.Translations, n)
 	}
 
+	// Sanitize: strip non-ASCII from romanized, clear if it matches translation
+	for i := range batchResp.Romanized {
+		batchResp.Romanized[i] = asciiOnly(batchResp.Romanized[i])
+		if batchResp.Romanized[i] == batchResp.Translations[i] {
+			batchResp.Romanized[i] = "" // model mixed up the arrays
+		}
+	}
+
 	return batchResp.Romanized, batchResp.Translations, nil
 }
 
@@ -184,4 +193,15 @@ func padTo(s []string, n int) []string {
 		s = append(s, "")
 	}
 	return s
+}
+
+// asciiOnly strips non-ASCII characters from a string.
+func asciiOnly(s string) string {
+	var b strings.Builder
+	for _, r := range s {
+		if r < 128 {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
 }

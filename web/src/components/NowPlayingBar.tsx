@@ -16,7 +16,6 @@ export const NowPlayingBar: React.FC<Props> = ({ track, status }) => {
         </div>
       );
     }
-
     return (
       <div className={styles.bar}>
         <span className={styles.noTrack}>No track playing</span>
@@ -27,6 +26,14 @@ export const NowPlayingBar: React.FC<Props> = ({ track, status }) => {
 
   return (
     <div className={styles.bar}>
+      {track.cover_art_url && (
+        <img
+          className={styles.cover}
+          src={track.cover_art_url}
+          alt={`${track.artist} - ${track.title} cover`}
+          onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+        />
+      )}
       <div className={styles.trackInfo}>
         <span className={styles.title} title={track.title}>{track.title}</span>
         <span className={styles.artist} title={track.artist}>{track.artist}</span>

@@ -12,8 +12,10 @@ export interface UsePlayerStateReturn {
   translating: boolean;
   paused: boolean;
   lyricsError: string | null;
+  offsetMs: number;
   handleTogglePlayPause: () => void;
   handleRetryLyrics: () => void;
+  handleUpdateOffset: (offsetMs: number) => void;
 }
 
 export function usePlayerState(): UsePlayerStateReturn {
@@ -25,6 +27,8 @@ export function usePlayerState(): UsePlayerStateReturn {
   const [fetchingLyrics, setFetchingLyrics] = useState(false);
   const [translating, setTranslating] = useState(false);
   const [lyricsError, setLyricsError] = useState<string | null>(null);
+  const [offsetMs, setOffsetMs] = useState(0);
+  const [songHash, setSongHash] = useState<string | null>(null);
 
   // Derive paused from player status reported via SSE
   const paused = status !== 'playing';
@@ -65,6 +69,10 @@ export function usePlayerState(): UsePlayerStateReturn {
         setTranslating(!!event.translating);
         if (event.lines) setLines(event.lines);
         if (event.not_found) setNotFound(true);
+        if (event.song) {
+          setOffsetMs(event.song.offset_ms ?? 0);
+          setSongHash(event.song.hash_key ?? null);
+        }
         break;
       case 'lyrics_error':
         setFetchingLyrics(false);
@@ -86,5 +94,16 @@ export function usePlayerState(): UsePlayerStateReturn {
 
   useSSE(handleEvent);
 
-  return { track, status, positionMs, lines, notFound, fetchingLyrics, translating, paused, lyricsError, handleTogglePlayPause, handleRetryLyrics };
+  const handleUpdateOffset = useCallback((newOffset: number) => {
+    setOffsetMs(newOffset);
+    if (songHash) {
+      fetch(`/api/songs/${encodeURIComponent(songHash)}/offset`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ offset_ms: Math.round(newOffset) }),
+      }).catch(() => {});
+    }
+  }, [songHash]);
+
+  return { track, status, positionMs, lines, notFound, fetchingLyrics, translating, paused, lyricsError, offsetMs, handleTogglePlayPause, handleRetryLyrics, handleUpdateOffset };
 }

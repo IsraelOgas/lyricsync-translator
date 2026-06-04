@@ -10,6 +10,7 @@ type Song struct {
 	Title      string    `json:"title"`
 	Album      string    `json:"album,omitempty"`
 	DurationMs int       `json:"duration_ms,omitempty"`
+	OffsetMs   int       `json:"offset_ms"`
 	Source     string    `json:"source"`
 	CreatedAt  time.Time `json:"created_at"`
 }
@@ -24,10 +25,11 @@ type LyricLine struct {
 	Lang     string `json:"lang,omitempty"`
 }
 
-// Translation holds romanization and Spanish translation for a lyric line.
+// Translation holds romanization and translation for a lyric line in a specific target language.
 type Translation struct {
-	ID           int    `json:"id"`
-	LyricLineID  int    `json:"lyric_line_id"`
-	Romanized    string `json:"romanized,omitempty"`
-	TranslatedES string `json:"translated_es,omitempty"`
+	ID             int    `json:"id"`
+	LyricLineID    int    `json:"lyric_line_id"`
+	Romanized      string `json:"romanized,omitempty"`
+	TranslatedText string `json:"translated_text,omitempty"`
+	TargetLang     string `json:"target_lang,omitempty"`
 }

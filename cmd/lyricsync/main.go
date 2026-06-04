@@ -65,7 +65,7 @@ func main() {
 	default:
 		log.Fatalf("Unknown translation provider: %s (expected 'libretranslate' or 'deepseek')", cfg.Translation.Provider)
 	}
-	tranSvc := translate.NewService(translator)
+	tranSvc := translate.NewService(translator, cfg.Translation.TargetLang)
 	fmt.Println("Translation service ready")
 
 	lyricsProvider := lyrics.NewProvider(cfg.Lyrics.Provider, cfg.Lyrics.LRCLib.BaseURL, cfg.Lyrics.LRCLib.TimeoutSec)

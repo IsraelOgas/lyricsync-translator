@@ -48,6 +48,7 @@ type DeepSeekConfig struct {
 
 type TranslationConfig struct {
 	Provider       string               `yaml:"provider"`
+	TargetLang     string               `yaml:"target_lang"`
 	LibreTranslate LibreTranslateConfig `yaml:"libretranslate"`
 	DeepSeek       DeepSeekConfig       `yaml:"deepseek"`
 	Romanization   RomanizationConfig   `yaml:"romanization"`
@@ -87,7 +88,8 @@ func DefaultConfig() *Config {
 			},
 		},
 		Translation: TranslationConfig{
-			Provider: "libretranslate",
+			Provider:   "libretranslate",
+			TargetLang: "es",
 			LibreTranslate: LibreTranslateConfig{
 				BaseURL:    "http://127.0.0.1:5000",
 				TimeoutSec: 30,
@@ -130,6 +132,9 @@ func applyEnvOverrides(cfg *Config) {
 	}
 	if v := os.Getenv("DEEPSEEK_API_KEY"); v != "" {
 		cfg.Translation.DeepSeek.APIKey = v
+	}
+	if v := os.Getenv("LYRIC_TARGET_LANG"); v != "" {
+		cfg.Translation.TargetLang = v
 	}
 	if v := os.Getenv("LYRIC_DB_PATH"); v != "" {
 		cfg.Cache.DBPath = v
