@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
+import { Settings } from 'lucide-react';
 import { usePlayerState } from './hooks/usePlayerState';
 import { useSettings } from './hooks/useSettings';
 import { useCoverColor } from './hooks/useCoverColor';
 import { NowPlayingBar } from './components/NowPlayingBar';
 import { LyricsViewer } from './components/LyricsViewer';
 import { SettingsPanel } from './components/SettingsPanel';
+import { PlayerBar } from './components/PlayerBar';
 import ErrorBoundary from './components/ErrorBoundary';
 import styles from './App.module.css';
 
 const App: React.FC = () => {
-  const { track, status, positionMs, lines, notFound, fetchingLyrics, translating, paused, lyricsError, offsetMs, handleTogglePlayPause, handleRetryLyrics, handleUpdateOffset } = usePlayerState();
+  const { track, status, positionMs, lines, notFound, fetchingLyrics, translating, paused, lyricsError, offsetMs, handleRetryLyrics, handleUpdateOffset } = usePlayerState();
   const { settings, updateSetting } = useSettings();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const coverColor = useCoverColor(track?.cover_art_url);
@@ -41,23 +43,14 @@ const App: React.FC = () => {
           onRetry={handleRetryLyrics}
           showRomanization={settings.showRomanization}
         />
-        <footer className={styles.footer}>
-          <button
-            className={styles.btn}
-            onClick={handleTogglePlayPause}
-            aria-label={status === 'playing' ? 'Pause' : 'Play'}
-            title={status === 'playing' ? 'Pause' : 'Play'}
-          >
-            {status === 'playing' ? '⏸' : '▶'}
-          </button>
-        </footer>
+        <PlayerBar track={track} status={status} positionMs={positionMs} />
         <button
           className={styles.settingsFab}
           onClick={() => setSettingsOpen(true)}
           aria-label="Open settings"
           title="Settings"
         >
-          ⚙
+          <Settings size={20} />
         </button>
       </div>
     </ErrorBoundary>

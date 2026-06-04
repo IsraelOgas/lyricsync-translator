@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
+import { Pause, RotateCcw } from 'lucide-react';
 import type { LyricLineData } from '../types';
 import styles from './LyricsViewer.module.css';
 
@@ -65,7 +66,7 @@ export const LyricsViewer: React.FC<Props> = ({ lines, positionMs, offsetMs, pau
       return (
         <div className={styles.empty}>
           <p className={styles.emptyText}>{lyricsError}</p>
-          <button className={styles.retryBtn} onClick={onRetry}>Retry</button>
+          <button className={styles.retryBtn} onClick={onRetry}><RotateCcw size={14} /> Retry</button>
         </div>
       );
     }
@@ -105,7 +106,7 @@ export const LyricsViewer: React.FC<Props> = ({ lines, positionMs, offsetMs, pau
   return (
     <div ref={containerRef} className={`${styles.container} ${paused ? styles.containerPaused : ''}`}>
       {paused && (
-        <div className={styles.pauseBanner}>⏸ PAUSED</div>
+        <div className={styles.pauseBanner}><Pause size={14} /> PAUSED</div>
       )}
 
       {lines.map((line, idx) => {

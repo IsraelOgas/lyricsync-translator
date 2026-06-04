@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "lucide-react": "^1.17.0",
     "react": "19.2.6",
     "react-dom": "19.2.6"
   },
@@ -20,6 +21,8 @@
     "vite": "8.0.14"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["esbuild"]
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
   }
 }

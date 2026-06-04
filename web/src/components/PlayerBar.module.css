@@ -1,0 +1,167 @@
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  gap: 16px;
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+  z-index: 10;
+  transition: background 0.8s ease, border-color 0.8s ease;
+}
+
+/* --- Progress --- */
+
+.progressRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.time {
+  font-size: 11px;
+  font-family: monospace;
+  color: var(--color-text-dim);
+  min-width: 32px;
+  text-align: center;
+}
+
+.progressTrack {
+  flex: 1;
+  height: 5px;
+  background: var(--color-surface-highlight);
+  border-radius: 3px;
+  cursor: pointer;
+  position: relative;
+  transition: height 0.15s ease;
+}
+
+.progressDisabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+.progressTrack:hover {
+  height: 7px;
+}
+
+.progressDisabled:hover {
+  height: 5px;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--color-primary);
+  border-radius: 3px;
+  transition: width 0.1s linear;
+}
+
+/* --- Controls --- */
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.btn:hover {
+  background: var(--color-surface-highlight);
+}
+
+.btn:active {
+  transform: scale(0.92);
+}
+
+.btnPlay {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: none;
+  background: var(--color-primary);
+  color: var(--color-bg);
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.1s ease, background 0.15s ease;
+}
+
+.btnPlay:hover {
+  filter: brightness(1.15);
+}
+
+.btnPlay:active {
+  transform: scale(0.92);
+}
+
+/* --- Volume --- */
+
+.volumeRow {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.btnVol {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--color-text-dim);
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s ease;
+}
+
+.btnVol:hover {
+  color: var(--color-text-bright);
+}
+
+/* --- Cinema mode --- */
+
+:global(:root[data-cinema]) .bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+:global(:root[data-cinema]) .time {
+  color: var(--color-text-dim);
+}
+
+:global(:root[data-cinema]) .btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+:global(:root[data-cinema]) .btnVol:hover {
+  color: var(--color-text-bright);
+}

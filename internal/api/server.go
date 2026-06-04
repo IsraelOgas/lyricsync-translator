@@ -100,6 +100,11 @@ func NewServer(
 	r.Put("/api/songs/{hash}/offset", s.handleUpdateOffset)
 	r.Post("/api/player/toggle", s.handleTogglePlayPause)
 	r.Post("/api/player/seek", s.handleSeek)
+	r.Post("/api/player/next", s.handleNext)
+	r.Post("/api/player/previous", s.handlePrevious)
+	r.Post("/api/player/volume", s.handleVolume)
+	r.Post("/api/player/shuffle", s.handleShuffle)
+	r.Post("/api/player/loop", s.handleLoop)
 
 	// Serve frontend static files in production
 	webDir := os.Getenv("WEB_DIR")
@@ -233,4 +238,62 @@ func (s *Server) handleSeek(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte(`{"ok":true}`))
+}
+
+func (s *Server) handleNext(w http.ResponseWriter, r *http.Request) {
+	if err := player.Next(s.cfg.Player.PlayerctlPath, s.tracker.GetActivePlayer()); err != nil {
+		log.Printf("Error skipping next: %v", err)
+		http.Error(w, `{"error":"failed to skip"}`, http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte(`{"ok":true}`))
+}
+
+func (s *Server) handlePrevious(w http.ResponseWriter, r *http.Request) {
+	if err := player.Previous(s.cfg.Player.PlayerctlPath, s.tracker.GetActivePlayer()); err != nil {
+		log.Printf("Error skipping previous: %v", err)
+		http.Error(w, `{"error":"failed to skip"}`, http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte(`{"ok":true}`))
+}
+
+func (s *Server) handleVolume(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Delta float64 `json:"delta"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, `{"error":"invalid json"}`, http.StatusBadRequest)
+		return
+	}
+	if err := player.SetVolume(s.cfg.Player.PlayerctlPath, s.tracker.GetActivePlayer(), body.Delta); err != nil {
+		log.Printf("Error setting volume: %v", err)
+		http.Error(w, `{"error":"failed to set volume"}`, http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte(`{"ok":true}`))
+}
+
+func (s *Server) handleShuffle(w http.ResponseWriter, r *http.Request) {
+	if err := player.Shuffle(s.cfg.Player.PlayerctlPath, s.tracker.GetActivePlayer()); err != nil {
+		log.Printf("Error toggling shuffle: %v", err)
+		http.Error(w, `{"error":"failed to toggle shuffle"}`, http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte(`{"ok":true}`))
+}
+
+func (s *Server) handleLoop(w http.ResponseWriter, r *http.Request) {
+	state, err := player.Loop(s.cfg.Player.PlayerctlPath, s.tracker.GetActivePlayer())
+	if err != nil {
+		log.Printf("Error cycling loop: %v", err)
+		http.Error(w, `{"error":"failed to cycle loop"}`, http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"loop": state})
 }

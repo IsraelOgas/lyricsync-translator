@@ -51,7 +51,7 @@ func (s PlayerStatus) String() string {
 // Returns an error if playerctl cannot be started (likely not installed).
 // The caller should receive StatusNoPlayer on the status channel in that case.
 func Start(playerctlPath string, activePlayer *string) (<-chan TrackInfo, <-chan PlayerStatus, <-chan int64, error) {
-	format := "{{artist}}||{{title}}||{{album}}||{{duration(mpris:length)}}||{{position}}||{{status}}||{{playerName}}||{{mpris:artUrl}}"
+	format := "{{artist}}||{{title}}||{{album}}||{{mpris:length}}||{{position}}||{{status}}||{{playerName}}||{{mpris:artUrl}}"
 
 	cmd := exec.Command(playerctlPath, "--follow", "-a", "--format", format, "metadata", "position", "status")
 
@@ -212,9 +212,84 @@ func SetPosition(playerctlPath string, playerName string, positionMs int) error 
 	return cmd.Run()
 }
 
+// Next skips to the next track.
+func Next(playerctlPath string, playerName string) error {
+	args := []string{"next"}
+	if playerName != "" {
+		args = append([]string{"-p", playerName}, args...)
+	}
+	return exec.Command(playerctlPath, args...).Run()
+}
+
+// Previous skips to the previous track.
+func Previous(playerctlPath string, playerName string) error {
+	args := []string{"previous"}
+	if playerName != "" {
+		args = append([]string{"-p", playerName}, args...)
+	}
+	return exec.Command(playerctlPath, args...).Run()
+}
+
+// SetVolume adjusts the player volume by a relative delta (e.g., +0.05 or -0.05).
+func SetVolume(playerctlPath string, playerName string, delta float64) error {
+	sign := "+"
+	if delta < 0 {
+		sign = "-"
+		delta = -delta
+	}
+	val := fmt.Sprintf("%.2f%s", delta, sign)
+	args := []string{"volume", val}
+	if playerName != "" {
+		args = append([]string{"-p", playerName}, args...)
+	}
+	return exec.Command(playerctlPath, args...).Run()
+}
+
+// Shuffle toggles the player shuffle state.
+func Shuffle(playerctlPath string, playerName string) error {
+	args := []string{"shuffle", "Toggle"}
+	if playerName != "" {
+		args = append([]string{"-p", playerName}, args...)
+	}
+	return exec.Command(playerctlPath, args...).Run()
+}
+
+// Loop cycles the player loop status: None → Track → Playlist → None.
+// Returns the new state string ("None", "Track", or "Playlist").
+func Loop(playerctlPath string, playerName string) (string, error) {
+	// Read current state
+	readArgs := []string{"loop"}
+	if playerName != "" {
+		readArgs = append([]string{"-p", playerName}, readArgs...)
+	}
+	out, err := exec.Command(playerctlPath, readArgs...).Output()
+	if err != nil {
+		return "", fmt.Errorf("reading loop state: %w", err)
+	}
+	current := strings.TrimSpace(string(out))
+
+	// Cycle: None → Track → Playlist → None
+	next := "Track"
+	switch current {
+	case "Track":
+		next = "Playlist"
+	case "Playlist":
+		next = "None"
+	}
+
+	writeArgs := []string{"loop", next}
+	if playerName != "" {
+		writeArgs = append([]string{"-p", playerName}, writeArgs...)
+	}
+	if err := exec.Command(playerctlPath, writeArgs...).Run(); err != nil {
+		return "", fmt.Errorf("setting loop: %w", err)
+	}
+	return next, nil
+}
+
 // GetCurrentTrack queries playerctl for the currently playing track (one-shot).
 func GetCurrentTrack(playerctlPath string) (string, *TrackInfo, PlayerStatus) {
-	format := "{{artist}}||{{title}}||{{album}}||{{duration(mpris:length)}}||{{status}}||{{playerName}}||{{mpris:artUrl}}"
+	format := "{{artist}}||{{title}}||{{album}}||{{mpris:length}}||{{status}}||{{playerName}}||{{mpris:artUrl}}"
 
 	cmd := exec.Command(playerctlPath, "-a", "--format", format, "metadata", "status")
 	out, err := cmd.Output()
@@ -324,7 +399,7 @@ func GetCurrentTrack(playerctlPath string) (string, *TrackInfo, PlayerStatus) {
 }
 
 func getPlayerTrack(playerctlPath, playerName string) (*TrackInfo, PlayerStatus) {
-	format := "{{artist}}||{{title}}||{{album}}||{{duration(mpris:length)}}||{{status}}||{{playerName}}||{{mpris:artUrl}}"
+	format := "{{artist}}||{{title}}||{{album}}||{{mpris:length}}||{{status}}||{{playerName}}||{{mpris:artUrl}}"
 	cmd := exec.Command(playerctlPath, "-p", playerName, "--format", format, "metadata", "status")
 	out, err := cmd.Output()
 	if err != nil {

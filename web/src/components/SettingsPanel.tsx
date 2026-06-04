@@ -1,4 +1,5 @@
 import React from 'react';
+import { X } from 'lucide-react';
 import type { Settings } from '../types';
 import styles from './SettingsPanel.module.css';
 
@@ -47,7 +48,7 @@ export const SettingsPanel: React.FC<Props> = ({ isOpen, settings, onUpdateSetti
         <div className={styles.header}>
           <h2 className={styles.title}>Settings</h2>
           <button className={styles.closeBtn} onClick={onClose} aria-label="Close settings">
-            ✕
+            <X size={18} />
           </button>
         </div>
 

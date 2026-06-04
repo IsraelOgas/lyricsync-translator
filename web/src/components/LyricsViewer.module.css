@@ -57,6 +57,8 @@
 
 .lineInactive {
   opacity: 0.3;
+  transform: scale(0.80);
+  transform-origin: center center;
 }
 
 .original {
@@ -162,7 +164,9 @@
 :global(:root[data-cinema]) .container,
 :global(:root[data-cinema]) .containerPaused {
   padding-top: 84px;
-  padding-bottom: 60px;
+  padding-bottom: 70px;
+  scroll-padding-top: 84px;
+  scroll-padding-bottom: 70px;
 }
 
 :global(:root[data-cinema]) .emptyText,
