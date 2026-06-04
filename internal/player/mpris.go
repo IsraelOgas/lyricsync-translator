@@ -200,6 +200,18 @@ func TogglePlayPause(playerctlPath string, playerName string) error {
 	return cmd.Run()
 }
 
+// SetPosition seeks the given MPRIS player to a position in milliseconds.
+// If playerName is empty, targets the first available player.
+func SetPosition(playerctlPath string, playerName string, positionMs int) error {
+	seconds := float64(positionMs) / 1000.0
+	args := []string{"position", fmt.Sprintf("%.3f", seconds)}
+	if playerName != "" {
+		args = append([]string{"-p", playerName}, args...)
+	}
+	cmd := exec.Command(playerctlPath, args...)
+	return cmd.Run()
+}
+
 // GetCurrentTrack queries playerctl for the currently playing track (one-shot).
 func GetCurrentTrack(playerctlPath string) (string, *TrackInfo, PlayerStatus) {
 	format := "{{artist}}||{{title}}||{{album}}||{{duration(mpris:length)}}||{{status}}||{{playerName}}||{{mpris:artUrl}}"

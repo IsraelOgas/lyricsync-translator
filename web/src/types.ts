@@ -60,6 +60,7 @@ export interface Settings {
   translationColor: string;
   romanizationColor: string;
   targetLang: string;
+  cinemaMode: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -71,4 +72,5 @@ export const DEFAULT_SETTINGS: Settings = {
   translationColor: '#55aa55',
   romanizationColor: '#8888cc',
   targetLang: 'es',
+  cinemaMode: false,
 };

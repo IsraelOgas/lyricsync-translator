@@ -99,6 +99,7 @@ func NewServer(
 	r.Get("/api/songs/{hash}/offset", s.handleGetOffset)
 	r.Put("/api/songs/{hash}/offset", s.handleUpdateOffset)
 	r.Post("/api/player/toggle", s.handleTogglePlayPause)
+	r.Post("/api/player/seek", s.handleSeek)
 
 	// Serve frontend static files in production
 	webDir := os.Getenv("WEB_DIR")
@@ -206,6 +207,28 @@ func (s *Server) handleTogglePlayPause(w http.ResponseWriter, r *http.Request) {
 	if err := player.TogglePlayPause(s.cfg.Player.PlayerctlPath, s.tracker.GetActivePlayer()); err != nil {
 		log.Printf("Error toggling play-pause: %v", err)
 		http.Error(w, `{"error":"failed to toggle"}`, http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte(`{"ok":true}`))
+}
+
+func (s *Server) handleSeek(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		PositionMs int `json:"position_ms"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, `{"error":"invalid json"}`, http.StatusBadRequest)
+		return
+	}
+	// Guard: don't seek to negative positions
+	if body.PositionMs < 0 {
+		http.Error(w, `{"error":"position must be >= 0"}`, http.StatusBadRequest)
+		return
+	}
+	if err := player.SetPosition(s.cfg.Player.PlayerctlPath, s.tracker.GetActivePlayer(), body.PositionMs); err != nil {
+		log.Printf("Error seeking: %v", err)
+		http.Error(w, `{"error":"failed to seek"}`, http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")

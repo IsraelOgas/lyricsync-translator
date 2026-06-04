@@ -7,6 +7,8 @@ interface Props {
   settings: Settings;
   onUpdateSetting: <K extends keyof Settings>(key: K, value: Settings[K]) => void;
   onClose: () => void;
+  offsetMs: number;
+  onUpdateOffset: (offsetMs: number) => void;
 }
 
 const THEMES: { value: Settings['theme']; label: string }[] = [
@@ -35,7 +37,7 @@ const LANGUAGES: { value: string; label: string }[] = [
   { value: 'zh', label: '中文' },
 ];
 
-export const SettingsPanel: React.FC<Props> = ({ isOpen, settings, onUpdateSetting, onClose }) => {
+export const SettingsPanel: React.FC<Props> = ({ isOpen, settings, onUpdateSetting, onClose, offsetMs, onUpdateOffset }) => {
   if (!isOpen) return null;
 
   return (
@@ -50,6 +52,23 @@ export const SettingsPanel: React.FC<Props> = ({ isOpen, settings, onUpdateSetti
         </div>
 
         <div className={styles.body}>
+
+          {/* Sync Offset */}
+          <div className={styles.field}>
+            <label className={styles.label}>Sync Offset</label>
+            <div className={styles.sliderRow}>
+              <input
+                type="range"
+                className={styles.slider}
+                min={-5000}
+                max={5000}
+                step={100}
+                value={offsetMs}
+                onChange={e => onUpdateOffset(Number(e.target.value))}
+              />
+              <span className={styles.sliderValue}>{offsetMs > 0 ? '+' : ''}{(offsetMs / 1000).toFixed(1)}s</span>
+            </div>
+          </div>
 
           {/* Font Size */}
           <div className={styles.field}>
@@ -168,6 +187,17 @@ export const SettingsPanel: React.FC<Props> = ({ isOpen, settings, onUpdateSetti
               className={styles.checkbox}
               checked={settings.showRomanization}
               onChange={e => onUpdateSetting('showRomanization', e.target.checked)}
+            />
+          </div>
+
+          {/* Cinema Mode */}
+          <div className={styles.toggleRow}>
+            <label className={styles.label}>Cinema Mode</label>
+            <input
+              type="checkbox"
+              className={styles.checkbox}
+              checked={settings.cinemaMode}
+              onChange={e => onUpdateSetting('cinemaMode', e.target.checked)}
             />
           </div>
 

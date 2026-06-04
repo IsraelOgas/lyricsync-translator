@@ -22,6 +22,7 @@ function loadFromStorage(): Settings {
       translationColor: typeof parsed.translationColor === 'string' ? parsed.translationColor : DEFAULT_SETTINGS.translationColor,
       romanizationColor: typeof parsed.romanizationColor === 'string' ? parsed.romanizationColor : DEFAULT_SETTINGS.romanizationColor,
       targetLang: typeof parsed.targetLang === 'string' ? parsed.targetLang : DEFAULT_SETTINGS.targetLang,
+      cinemaMode: typeof parsed.cinemaMode === 'boolean' ? parsed.cinemaMode : DEFAULT_SETTINGS.cinemaMode,
     };
   } catch {
     return DEFAULT_SETTINGS;
@@ -44,6 +45,12 @@ function applySettings(settings: Settings): void {
   root.style.setProperty('--color-romanization', settings.romanizationColor);
   root.style.setProperty('--color-translation', settings.translationColor);
   root.setAttribute('data-theme', settings.theme);
+
+  if (settings.cinemaMode) {
+    root.setAttribute('data-cinema', '');
+  } else {
+    root.removeAttribute('data-cinema');
+  }
 }
 
 export interface UseSettingsReturn {
