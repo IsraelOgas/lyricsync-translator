@@ -1,5 +1,9 @@
 :root {
   --font-size-lyrics: 22px;
+  --font-family-lyrics: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --line-spacing-lyrics: 1.8;
+  --color-translation: #55aa55;
+  --color-romanization: #8888cc;
   --color-bg: #0a0a0a;
   --color-surface: #111122;
   --color-surface-alt: #1a1a2e;
@@ -15,6 +19,60 @@
   --color-status-bg: #1a3a1a;
   --color-muted: #555577;
   --color-muted-alt: #444466;
+}
+
+/* --- Theme: Dark Blue --- */
+:root[data-theme="dark-blue"] {
+  --color-bg: #050a14;
+  --color-surface: #0d1630;
+  --color-surface-alt: #152244;
+  --color-surface-highlight: #1a2a55;
+  --color-surface-gradient: #111d3a;
+  --color-border: #1e3260;
+  --color-text: #c8d6e5;
+  --color-text-bright: #e8f0ff;
+  --color-text-dim: #4a5578;
+  --color-primary: #5b8def;
+  --color-status: #44aa44;
+  --color-status-bg: #1a3a1a;
+  --color-muted: #3d4a6e;
+  --color-muted-alt: #2d3858;
+}
+
+/* --- Theme: Warm Amber --- */
+:root[data-theme="warm-amber"] {
+  --color-bg: #0d0804;
+  --color-surface: #1a1310;
+  --color-surface-alt: #261c14;
+  --color-surface-highlight: #332418;
+  --color-surface-gradient: #201810;
+  --color-border: #3a2a1a;
+  --color-text: #e8d5c0;
+  --color-text-bright: #fff0e0;
+  --color-text-dim: #6b5a44;
+  --color-primary: #e8a850;
+  --color-status: #55aa55;
+  --color-status-bg: #1a3a1a;
+  --color-muted: #5c4838;
+  --color-muted-alt: #443326;
+}
+
+/* --- Theme: Minimal Mono --- */
+:root[data-theme="minimal-mono"] {
+  --color-bg: #080808;
+  --color-surface: #141414;
+  --color-surface-alt: #1c1c1c;
+  --color-surface-highlight: #242424;
+  --color-surface-gradient: #181818;
+  --color-border: #2a2a2a;
+  --color-text: #c0c0c0;
+  --color-text-bright: #f0f0f0;
+  --color-text-dim: #505050;
+  --color-primary: #909090;
+  --color-status: #909090;
+  --color-status-bg: #1c1c1c;
+  --color-muted: #404040;
+  --color-muted-alt: #303030;
 }
 
 @keyframes lyricsync-spin {

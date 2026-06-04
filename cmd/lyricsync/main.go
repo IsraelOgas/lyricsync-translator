@@ -3,9 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"github.com/joho/godotenv"
 
 	"github.com/imov/lyricsync-translator/internal/api"
 	"github.com/imov/lyricsync-translator/internal/cache"
@@ -16,6 +19,11 @@ import (
 )
 
 func main() {
+	// Load .env file if present (does not override existing env vars)
+	if err := godotenv.Load(); err != nil {
+		log.Printf("No .env file found, using system env vars only")
+	}
+
 	cfg, err := config.Load("")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error loading config: %v\n", err)
@@ -39,12 +47,25 @@ func main() {
 	tracker := player.NewTracker(cfg.Player.PlayerctlPath)
 	fmt.Println("Player tracker started")
 
-	tranClient := translate.NewClient(
-		cfg.Translation.LibreTranslate.BaseURL,
-		cfg.Translation.LibreTranslate.TimeoutSec,
-		cfg.Translation.LibreTranslate.APIKey,
-	)
-	tranSvc := translate.NewService(tranClient, cfg.Translation.Romanization.Languages)
+	var translator translate.Translator
+	switch cfg.Translation.Provider {
+	case "libretranslate":
+		translator = translate.NewLibreTranslateClient(
+			cfg.Translation.LibreTranslate.BaseURL,
+			cfg.Translation.LibreTranslate.TimeoutSec,
+			cfg.Translation.LibreTranslate.APIKey,
+		)
+	case "deepseek":
+		translator = translate.NewDeepSeekClient(
+			cfg.Translation.DeepSeek.APIKey,
+			cfg.Translation.DeepSeek.Model,
+			cfg.Translation.DeepSeek.BaseURL,
+			cfg.Translation.DeepSeek.TimeoutSec,
+		)
+	default:
+		log.Fatalf("Unknown translation provider: %s (expected 'libretranslate' or 'deepseek')", cfg.Translation.Provider)
+	}
+	tranSvc := translate.NewService(translator)
 	fmt.Println("Translation service ready")
 
 	lyricsProvider := lyrics.NewProvider(cfg.Lyrics.Provider, cfg.Lyrics.LRCLib.BaseURL, cfg.Lyrics.LRCLib.TimeoutSec)

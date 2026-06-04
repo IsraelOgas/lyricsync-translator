@@ -52,6 +52,19 @@ export interface LyricsErrorEvent {
 export interface Settings {
   fontSize: number;
   showRomanization: boolean;
+  fontFamily: 'sans' | 'serif' | 'mono' | 'rounded';
+  lineSpacing: number;
+  theme: 'dark-purple' | 'dark-blue' | 'warm-amber' | 'minimal-mono';
+  translationColor: string;
+  romanizationColor: string;
 }
 
-export const DEFAULT_SETTINGS: Settings = { fontSize: 22, showRomanization: true };
+export const DEFAULT_SETTINGS: Settings = {
+  fontSize: 22,
+  showRomanization: true,
+  fontFamily: 'sans',
+  lineSpacing: 1.8,
+  theme: 'dark-purple',
+  translationColor: '#55aa55',
+  romanizationColor: '#8888cc',
+};

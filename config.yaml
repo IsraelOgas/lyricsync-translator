@@ -16,11 +16,16 @@ lyrics:
     timeout_sec: 15
 
 translation:
-  provider: "libretranslate"
+  provider: "deepseek"        # "libretranslate" or "deepseek"
   libretranslate:
     base_url: "http://127.0.0.1:5000"
     timeout_sec: 30
     api_key: ""                      # Get one at https://libretranslate.com
+  deepseek:
+    base_url: "https://api.deepseek.com"
+    model: "deepseek-chat"
+    timeout_sec: 60
+    api_key: ""                      # Set DEEPSEEK_API_KEY env var instead
   romanization:
     enabled: true
     languages: ["ja", "zh", "ko"]  # ISO 639-1 codes

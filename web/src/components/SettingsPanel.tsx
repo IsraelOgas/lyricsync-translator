@@ -9,6 +9,20 @@ interface Props {
   onClose: () => void;
 }
 
+const THEMES: { value: Settings['theme']; label: string }[] = [
+  { value: 'dark-purple', label: 'Dark Purple' },
+  { value: 'dark-blue', label: 'Dark Blue' },
+  { value: 'warm-amber', label: 'Warm Amber' },
+  { value: 'minimal-mono', label: 'Minimal Mono' },
+];
+
+const FONTS: { value: Settings['fontFamily']; label: string }[] = [
+  { value: 'sans', label: 'Sans-serif' },
+  { value: 'serif', label: 'Serif' },
+  { value: 'mono', label: 'Monospace' },
+  { value: 'rounded', label: 'Rounded' },
+];
+
 export const SettingsPanel: React.FC<Props> = ({ isOpen, settings, onUpdateSetting, onClose }) => {
   if (!isOpen) return null;
 
@@ -23,29 +37,112 @@ export const SettingsPanel: React.FC<Props> = ({ isOpen, settings, onUpdateSetti
           </button>
         </div>
 
-        <div className={styles.field}>
-          <label className={styles.label} htmlFor="font-size-slider">Font Size</label>
-          <input
-            id="font-size-slider"
-            type="range"
-            className={styles.slider}
-            min={14}
-            max={40}
-            value={settings.fontSize}
-            onChange={e => onUpdateSetting('fontSize', Number(e.target.value))}
-          />
-          <span className={styles.sliderValue}>{settings.fontSize}px</span>
-        </div>
+        <div className={styles.body}>
 
-        <div className={styles.toggleRow}>
-          <label className={styles.label} htmlFor="romanization-toggle">Show Romanization</label>
-          <input
-            id="romanization-toggle"
-            type="checkbox"
-            className={styles.checkbox}
-            checked={settings.showRomanization}
-            onChange={e => onUpdateSetting('showRomanization', e.target.checked)}
-          />
+          {/* Font Size */}
+          <div className={styles.field}>
+            <label className={styles.label}>Font Size</label>
+            <div className={styles.sliderRow}>
+              <input
+                type="range"
+                className={styles.slider}
+                min={14}
+                max={40}
+                value={settings.fontSize}
+                onChange={e => onUpdateSetting('fontSize', Number(e.target.value))}
+              />
+              <span className={styles.sliderValue}>{settings.fontSize}px</span>
+            </div>
+          </div>
+
+          {/* Font Family */}
+          <div className={styles.field}>
+            <label className={styles.label}>Font</label>
+            <div className={styles.chipRow}>
+              {FONTS.map(f => (
+                <button
+                  key={f.value}
+                  className={`${styles.chip} ${settings.fontFamily === f.value ? styles.chipActive : ''}`}
+                  onClick={() => onUpdateSetting('fontFamily', f.value)}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Line Spacing */}
+          <div className={styles.field}>
+            <label className={styles.label}>Line Spacing</label>
+            <div className={styles.sliderRow}>
+              <input
+                type="range"
+                className={styles.slider}
+                min={1}
+                max={2.5}
+                step={0.1}
+                value={settings.lineSpacing}
+                onChange={e => onUpdateSetting('lineSpacing', Number(e.target.value))}
+              />
+              <span className={styles.sliderValue}>{settings.lineSpacing}</span>
+            </div>
+          </div>
+
+          {/* Theme */}
+          <div className={styles.field}>
+            <label className={styles.label}>Theme</label>
+            <div className={styles.chipRow}>
+              {THEMES.map(t => (
+                <button
+                  key={t.value}
+                  className={`${styles.chip} ${settings.theme === t.value ? styles.chipActive : ''}`}
+                  onClick={() => onUpdateSetting('theme', t.value)}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Romanization Color */}
+          <div className={styles.field}>
+            <label className={styles.label}>Romanization Color</label>
+            <div className={styles.colorRow}>
+              <input
+                type="color"
+                className={styles.colorInput}
+                value={settings.romanizationColor}
+                onChange={e => onUpdateSetting('romanizationColor', e.target.value)}
+              />
+              <span className={styles.colorValue}>{settings.romanizationColor}</span>
+            </div>
+          </div>
+
+          {/* Translation Color */}
+          <div className={styles.field}>
+            <label className={styles.label}>Translation Color</label>
+            <div className={styles.colorRow}>
+              <input
+                type="color"
+                className={styles.colorInput}
+                value={settings.translationColor}
+                onChange={e => onUpdateSetting('translationColor', e.target.value)}
+              />
+              <span className={styles.colorValue}>{settings.translationColor}</span>
+            </div>
+          </div>
+
+          {/* Show Romanization */}
+          <div className={styles.toggleRow}>
+            <label className={styles.label}>Show Romanization</label>
+            <input
+              type="checkbox"
+              className={styles.checkbox}
+              checked={settings.showRomanization}
+              onChange={e => onUpdateSetting('showRomanization', e.target.checked)}
+            />
+          </div>
+
         </div>
       </div>
     </>

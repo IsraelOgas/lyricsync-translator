@@ -39,10 +39,18 @@ type LRCLibConfig struct {
 	TimeoutSec int    `yaml:"timeout_sec"`
 }
 
+type DeepSeekConfig struct {
+	BaseURL    string `yaml:"base_url"`
+	APIKey     string `yaml:"api_key"`
+	Model      string `yaml:"model"`
+	TimeoutSec int    `yaml:"timeout_sec"`
+}
+
 type TranslationConfig struct {
-	Provider    string              `yaml:"provider"`
+	Provider       string               `yaml:"provider"`
 	LibreTranslate LibreTranslateConfig `yaml:"libretranslate"`
-	Romanization RomanizationConfig `yaml:"romanization"`
+	DeepSeek       DeepSeekConfig       `yaml:"deepseek"`
+	Romanization   RomanizationConfig   `yaml:"romanization"`
 }
 
 type LibreTranslateConfig struct {
@@ -85,6 +93,12 @@ func DefaultConfig() *Config {
 				TimeoutSec: 30,
 				APIKey:     "",
 			},
+			DeepSeek: DeepSeekConfig{
+				BaseURL:    "https://api.deepseek.com",
+				Model:      "deepseek-v4-flash",
+				TimeoutSec: 60,
+				APIKey:     "",
+			},
 			Romanization: RomanizationConfig{
 				Enabled:   true,
 				Languages: []string{"ja", "zh", "ko"},
@@ -98,7 +112,7 @@ func DefaultConfig() *Config {
 
 // applyEnvOverrides applies environment variable overrides to the config.
 // Called after YAML loading so env vars always take precedence over file values.
-// Supported env vars: LYRIC_HOST, LYRIC_PORT, LIBRETRANSLATE_URL, LIBRETRANSLATE_API_KEY, LYRIC_DB_PATH
+// Supported env vars: LYRIC_HOST, LYRIC_PORT, LIBRETRANSLATE_URL, LIBRETRANSLATE_API_KEY, DEEPSEEK_API_KEY, LYRIC_DB_PATH
 func applyEnvOverrides(cfg *Config) {
 	if v := os.Getenv("LYRIC_HOST"); v != "" {
 		cfg.Server.Host = v
@@ -113,6 +127,9 @@ func applyEnvOverrides(cfg *Config) {
 	}
 	if v := os.Getenv("LIBRETRANSLATE_API_KEY"); v != "" {
 		cfg.Translation.LibreTranslate.APIKey = v
+	}
+	if v := os.Getenv("DEEPSEEK_API_KEY"); v != "" {
+		cfg.Translation.DeepSeek.APIKey = v
 	}
 	if v := os.Getenv("LYRIC_DB_PATH"); v != "" {
 		cfg.Cache.DBPath = v

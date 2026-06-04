@@ -22,3 +22,8 @@ Thumbs.db
 
 # temporary files
 tmp/
+
+# env files
+.env
+.env.local
+.env.*.local

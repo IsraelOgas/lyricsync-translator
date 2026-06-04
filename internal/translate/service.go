@@ -2,21 +2,17 @@ package translate
 
 import (
 	"context"
-	"sync"
+	"log"
 )
 
-// Service orchestrates romanization and translation.
+// Service orchestrates translation via the Translator interface.
 type Service struct {
-	translateClient *Client
-	romanLanguages  []string
+	translator Translator
 }
 
 // NewService creates a new translation service.
-func NewService(translateClient *Client, romanLanguages []string) *Service {
-	return &Service{
-		translateClient: translateClient,
-		romanLanguages:  romanLanguages,
-	}
+func NewService(translator Translator) *Service {
+	return &Service{translator: translator}
 }
 
 // LineResult holds the processed output for one original line.
@@ -27,64 +23,49 @@ type LineResult struct {
 	Lang       string `json:"lang"`
 }
 
-// ProcessLine detects language, romanizes if applicable, and translates to Spanish.
+// ProcessLine detects language and translates a single line to Spanish.
 func (s *Service) ProcessLine(ctx context.Context, original string) (romanized, translated string, err error) {
 	if original == "" {
 		return "", "", nil
 	}
 
 	lang := DetectLanguage(original)
-	if ShouldRomanize(lang, s.romanLanguages) {
-		romanized, err = RomanizeText(original, lang)
-		if err != nil {
-			romanized = ""
-		}
-	}
-
-	translated, err = s.translateClient.Translate(original, lang, "es")
+	translated, err = s.translator.Translate(original, lang, "es")
 	if err != nil {
 		translated = ""
 	}
 
-	return romanized, translated, nil
+	return "", translated, nil
 }
 
-// ProcessLines processes multiple lines concurrently with a worker pool.
+// ProcessLines sends all lines to the translator in a single batch call.
+// The Translator handles both romanization and translation internally.
 func (s *Service) ProcessLines(ctx context.Context, lines []string) ([]LineResult, error) {
 	if len(lines) == 0 {
 		return nil, nil
 	}
 
-	results := make([]LineResult, len(lines))
-	var wg sync.WaitGroup
-	sem := make(chan struct{}, 4) // max 4 concurrent API calls
+	n := len(lines)
 
-	for i, line := range lines {
-		select {
-		case <-ctx.Done():
-			break
-		default:
-		}
-
-		wg.Add(1)
-		sem <- struct{}{}
-		go func(idx int, text string) {
-			defer wg.Done()
-			defer func() { <-sem }()
-
-			romanized, translated, err := s.ProcessLine(ctx, text)
-			lang := DetectLanguage(text)
-
-			results[idx] = LineResult{
-				Original:   text,
-				Romanized:  romanized,
-				Translated: translated,
-				Lang:       lang,
-			}
-			_ = err // non-blocking: errors are captured in empty fields
-		}(i, line)
+	log.Printf("translate: sending %d lines to provider", n)
+	romanized, translated, err := s.translator.TranslateBatch(lines, "auto", "es")
+	if err != nil {
+		log.Printf("translate: batch failed: %v", err)
+		romanized = make([]string, n)
+		translated = make([]string, n)
+	} else {
+		log.Printf("translate: got %d romanized, %d translations back", len(romanized), len(translated))
 	}
 
-	wg.Wait()
+	results := make([]LineResult, n)
+	for i := range lines {
+		results[i] = LineResult{
+			Original:   lines[i],
+			Romanized:  romanized[i],
+			Translated: translated[i],
+			Lang:       DetectLanguage(lines[i]),
+		}
+	}
+
 	return results, nil
 }

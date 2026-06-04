@@ -5,19 +5,20 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 )
 
-// Client is the LibreTranslate HTTP client.
-type Client struct {
+// LibreTranslateClient is the LibreTranslate HTTP client.
+type LibreTranslateClient struct {
 	baseURL    string
 	httpClient *http.Client
 	apiKey     string
 }
 
-// NewClient creates a new LibreTranslate client.
-func NewClient(baseURL string, timeoutSec int, apiKey string) *Client {
-	return &Client{
+// NewLibreTranslateClient creates a new LibreTranslate client.
+func NewLibreTranslateClient(baseURL string, timeoutSec int, apiKey string) *LibreTranslateClient {
+	return &LibreTranslateClient{
 		baseURL: baseURL,
 		httpClient: &http.Client{
 			Timeout: time.Duration(timeoutSec) * time.Second,
@@ -41,7 +42,7 @@ type translateResponse struct {
 
 // Translate sends text to LibreTranslate and returns the Spanish translation.
 // source can be "auto" for automatic language detection.
-func (c *Client) Translate(text, source, target string) (string, error) {
+func (c *LibreTranslateClient) Translate(text, source, target string) (string, error) {
 	if text == "" {
 		return "", nil
 	}
@@ -83,4 +84,35 @@ func (c *Client) Translate(text, source, target string) (string, error) {
 	}
 
 	return result.TranslatedText, nil
+}
+
+// TranslateBatch translates multiple lines concurrently with a worker pool.
+// Returns empty romanized slice — LibreTranslate does not handle romanization.
+func (c *LibreTranslateClient) TranslateBatch(lines []string, source, target string) ([]string, []string, error) {
+	if len(lines) == 0 {
+		return nil, nil, nil
+	}
+
+	results := make([]string, len(lines))
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, 4)
+
+	for i, line := range lines {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(idx int, text string) {
+			defer wg.Done()
+			defer func() { <-sem }()
+
+			translated, err := c.Translate(text, source, target)
+			if err != nil {
+				results[idx] = ""
+			} else {
+				results[idx] = translated
+			}
+		}(i, line)
+	}
+
+	wg.Wait()
+	return nil, results, nil
 }

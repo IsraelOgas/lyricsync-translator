@@ -1,6 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Settings, DEFAULT_SETTINGS } from '../types';
 
+const FONT_FAMILIES: Record<Settings['fontFamily'], string> = {
+  sans: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+  serif: "'Lora', 'Georgia', 'Times New Roman', serif",
+  mono: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
+  rounded: "'Nunito', 'Quicksand', 'Segoe UI', sans-serif",
+};
+
 function loadFromStorage(): Settings {
   try {
     const raw = localStorage.getItem('lyricsync-settings');
@@ -9,6 +16,11 @@ function loadFromStorage(): Settings {
     return {
       fontSize: typeof parsed.fontSize === 'number' ? parsed.fontSize : DEFAULT_SETTINGS.fontSize,
       showRomanization: typeof parsed.showRomanization === 'boolean' ? parsed.showRomanization : DEFAULT_SETTINGS.showRomanization,
+      fontFamily: ['sans', 'serif', 'mono', 'rounded'].includes(parsed.fontFamily) ? parsed.fontFamily : DEFAULT_SETTINGS.fontFamily,
+      lineSpacing: typeof parsed.lineSpacing === 'number' ? parsed.lineSpacing : DEFAULT_SETTINGS.lineSpacing,
+      theme: ['dark-purple', 'dark-blue', 'warm-amber', 'minimal-mono'].includes(parsed.theme) ? parsed.theme : DEFAULT_SETTINGS.theme,
+      translationColor: typeof parsed.translationColor === 'string' ? parsed.translationColor : DEFAULT_SETTINGS.translationColor,
+      romanizationColor: typeof parsed.romanizationColor === 'string' ? parsed.romanizationColor : DEFAULT_SETTINGS.romanizationColor,
     };
   } catch {
     return DEFAULT_SETTINGS;
@@ -18,14 +30,19 @@ function loadFromStorage(): Settings {
 function saveToStorage(settings: Settings): void {
   try {
     localStorage.setItem('lyricsync-settings', JSON.stringify(settings));
-  } catch (err) {
-    // QuotaExceededError or unavailable — silently skip persistence.
-    // Settings live in-memory for the rest of the session.
-    if (err instanceof DOMException && (err.name === 'QuotaExceededError' || err.code === 22)) {
-      return;
-    }
-    // Other storage errors (e.g., private browsing restrictions) — also skip.
+  } catch {
+    // Silently skip if storage unavailable
   }
+}
+
+function applySettings(settings: Settings): void {
+  const root = document.documentElement;
+  root.style.setProperty('--font-size-lyrics', settings.fontSize + 'px');
+  root.style.setProperty('--font-family-lyrics', FONT_FAMILIES[settings.fontFamily]);
+  root.style.setProperty('--line-spacing-lyrics', String(settings.lineSpacing));
+  root.style.setProperty('--color-romanization', settings.romanizationColor);
+  root.style.setProperty('--color-translation', settings.translationColor);
+  root.setAttribute('data-theme', settings.theme);
 }
 
 export interface UseSettingsReturn {
@@ -36,15 +53,15 @@ export interface UseSettingsReturn {
 export function useSettings(): UseSettingsReturn {
   const [settings, setSettings] = useState<Settings>(loadFromStorage);
 
-  // Apply fontSize to CSS custom property on mount (restore persisted value)
+  // Apply all settings on mount
   useEffect(() => {
-    document.documentElement.style.setProperty('--font-size-lyrics', settings.fontSize + 'px');
+    applySettings(settings);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Keep CSS custom property in sync with fontSize
+  // Keep CSS in sync with state
   useEffect(() => {
-    document.documentElement.style.setProperty('--font-size-lyrics', settings.fontSize + 'px');
-  }, [settings.fontSize]);
+    applySettings(settings);
+  }, [settings]);
 
   const updateSetting = useCallback(<K extends keyof Settings>(key: K, value: Settings[K]) => {
     setSettings(prev => {
