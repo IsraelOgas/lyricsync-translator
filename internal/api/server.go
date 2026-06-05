@@ -105,7 +105,9 @@ func NewServer(
 	r.Get("/api/player/volume", s.handleGetVolume)
 	r.Post("/api/player/volume", s.handleVolume)
 	r.Post("/api/player/shuffle", s.handleShuffle)
+	r.Get("/api/player/shuffle", s.handleGetShuffle)
 	r.Post("/api/player/loop", s.handleLoop)
+	r.Get("/api/player/loop", s.handleGetLoop)
 
 	// Serve frontend static files in production
 	webDir := os.Getenv("WEB_DIR")
@@ -313,6 +315,29 @@ func (s *Server) handleLoop(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("Error cycling loop: %v", err)
 		http.Error(w, `{"error":"failed to cycle loop"}`, http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"loop": state})
+}
+
+func (s *Server) handleGetShuffle(w http.ResponseWriter, r *http.Request) {
+	state, err := player.GetShuffle(s.cfg.Player.PlayerctlPath, s.tracker.GetActivePlayer())
+	if err != nil {
+		log.Printf("Error reading shuffle state: %v", err)
+		http.Error(w, `{"error":"failed to read shuffle"}`, http.StatusInternalServerError)
+		return
+	}
+	on := state == "On"
+	w.Header().Set("Content-Type", "application/json")
+	fmt.Fprintf(w, `{"shuffle":%t}`, on)
+}
+
+func (s *Server) handleGetLoop(w http.ResponseWriter, r *http.Request) {
+	state, err := player.GetLoop(s.cfg.Player.PlayerctlPath, s.tracker.GetActivePlayer())
+	if err != nil {
+		log.Printf("Error reading loop state: %v", err)
+		http.Error(w, `{"error":"failed to read loop"}`, http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")

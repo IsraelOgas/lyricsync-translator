@@ -90,6 +90,14 @@
   transform: scale(0.92);
 }
 
+.btnActive {
+  color: var(--color-primary);
+}
+
+.btnActive:hover {
+  color: var(--color-primary);
+}
+
 .btnPlay {
   width: 42px;
   height: 42px;
@@ -197,6 +205,12 @@
 
 :global(:root[data-cinema]) .btn:hover {
   background: rgba(255, 255, 255, 0.08);
+}
+
+:global(:root[data-cinema]) .btnActive,
+:global(:root[data-cinema]) .btnActive:hover {
+  color: var(--color-primary);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 :global(:root[data-cinema]) .btnVol:hover {

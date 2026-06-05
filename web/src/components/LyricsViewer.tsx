@@ -112,22 +112,27 @@ export const LyricsViewer: React.FC<Props> = ({ lines, positionMs, offsetMs, pau
       {lines.map((line, idx) => {
         const isActive = idx === activeIdx && !paused;
         const isClickable = line.time_ms != null;
-        const pendingTranslation = translating && !line.romanized && !line.translated;
+        const isInstrumental = !line.original.trim();
+        const pendingTranslation = !isInstrumental && translating && !line.romanized && !line.translated;
         return (
           <div
             key={line.id || idx}
             data-active={isActive}
             className={`${styles.line} ${isActive ? styles.lineActive : styles.lineInactive} ${isClickable ? styles.clickable : ''}`}
             onClick={isClickable ? () => handleLineClick(line.time_ms!) : undefined}
-            title={isClickable ? 'Click to jump to this verse' : undefined}
+            title={isClickable ? (isInstrumental ? 'Instrumental' : 'Click to jump to this verse') : undefined}
           >
-            <p className={styles.original}>
-              {line.original}
-            </p>
-            {showRomanization !== false && line.romanized && (
+            {isInstrumental ? (
+              <p className={styles.instrumental}>— ♪ —</p>
+            ) : (
+              <p className={styles.original}>
+                {line.original}
+              </p>
+            )}
+            {!isInstrumental && showRomanization !== false && line.romanized && (
               <p className={styles.romanized}>{line.romanized}</p>
             )}
-            {line.translated && (
+            {!isInstrumental && line.translated && (
               <p className={styles.translated}>{line.translated}</p>
             )}
             {pendingTranslation && (

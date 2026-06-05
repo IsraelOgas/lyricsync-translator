@@ -280,6 +280,32 @@ func Shuffle(playerctlPath string, playerName string) error {
 	return exec.Command(playerctlPath, args...).Run()
 }
 
+// GetShuffle returns whether shuffle is enabled ("On") or not ("Off").
+func GetShuffle(playerctlPath string, playerName string) (string, error) {
+	args := []string{"shuffle"}
+	if playerName != "" {
+		args = append([]string{"-p", playerName}, args...)
+	}
+	out, err := exec.Command(playerctlPath, args...).Output()
+	if err != nil {
+		return "", fmt.Errorf("playerctl shuffle: %w", err)
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
+// GetLoop returns the current loop state: "None", "Track", or "Playlist".
+func GetLoop(playerctlPath string, playerName string) (string, error) {
+	args := []string{"loop"}
+	if playerName != "" {
+		args = append([]string{"-p", playerName}, args...)
+	}
+	out, err := exec.Command(playerctlPath, args...).Output()
+	if err != nil {
+		return "", fmt.Errorf("playerctl loop: %w", err)
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
 // Loop cycles the player loop status: None → Track → Playlist → None.
 // Returns the new state string ("None", "Track", or "Playlist").
 func Loop(playerctlPath string, playerName string) (string, error) {

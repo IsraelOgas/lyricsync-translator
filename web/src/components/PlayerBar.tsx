@@ -33,15 +33,17 @@ export const PlayerBar: React.FC<Props> = ({ track, status, positionMs }) => {
   const progress = hasDuration ? Math.min(1, Math.max(0, positionMs / durationMs)) : 0;
   const isPlaying = status === 'playing';
   const [loopState, setLoopState] = useState<string>('none');
+  const [shuffleOn, setShuffleOn] = useState(false);
   const [vol, setVol] = useState(0.5);
   const [muted, setMuted] = useState(false);
   const prevVol = useRef(0.5);
-  const volumeFetched = useRef(false);
+  const stateFetched = useRef(false);
 
-  // Fetch initial volume from backend
+  // Fetch initial player state from backend
   useEffect(() => {
-    if (volumeFetched.current) return;
-    volumeFetched.current = true;
+    if (stateFetched.current) return;
+    stateFetched.current = true;
+
     fetch('/api/player/volume')
       .then(r => r.json())
       .then(data => {
@@ -49,6 +51,16 @@ export const PlayerBar: React.FC<Props> = ({ track, status, positionMs }) => {
         setVol(v);
         prevVol.current = v;
       })
+      .catch(() => {});
+
+    fetch('/api/player/shuffle')
+      .then(r => r.json())
+      .then(data => setShuffleOn(!!data.shuffle))
+      .catch(() => {});
+
+    fetch('/api/player/loop')
+      .then(r => r.json())
+      .then(data => setLoopState((data.loop ?? 'None').toLowerCase()))
       .catch(() => {});
   }, []);
 
@@ -58,6 +70,16 @@ export const PlayerBar: React.FC<Props> = ({ track, status, positionMs }) => {
     const ratio = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
     post('/api/player/seek', { position_ms: Math.round(ratio * durationMs) });
   }, [hasDuration, durationMs]);
+
+  const handleShuffle = useCallback(async () => {
+    try {
+      await fetch('/api/player/shuffle', { method: 'POST' });
+      // Read back the new state to stay in sync
+      const res = await fetch('/api/player/shuffle');
+      const data = await res.json();
+      setShuffleOn(!!data.shuffle);
+    } catch { /* ignore */ }
+  }, []);
 
   const handleLoop = useCallback(async () => {
     try {
@@ -109,7 +131,12 @@ export const PlayerBar: React.FC<Props> = ({ track, status, positionMs }) => {
 
       {/* Controls */}
       <div className={styles.controls}>
-        <button className={styles.btn} onClick={() => post('/api/player/shuffle')} title="Shuffle" aria-label="Shuffle">
+        <button
+          className={`${styles.btn} ${shuffleOn ? styles.btnActive : ''}`}
+          onClick={handleShuffle}
+          title={shuffleOn ? 'Shuffle on' : 'Shuffle off'}
+          aria-label={shuffleOn ? 'Shuffle on' : 'Shuffle off'}
+        >
           <Shuffle size={iconSize} />
         </button>
         <button className={styles.btn} onClick={() => post('/api/player/previous')} title="Previous" aria-label="Previous">
@@ -121,7 +148,12 @@ export const PlayerBar: React.FC<Props> = ({ track, status, positionMs }) => {
         <button className={styles.btn} onClick={() => post('/api/player/next')} title="Next" aria-label="Next">
           <SkipForward size={iconSize} />
         </button>
-        <button className={styles.btn} onClick={handleLoop} title="Loop" aria-label="Loop">
+        <button
+          className={`${styles.btn} ${loopState !== 'none' ? styles.btnActive : ''}`}
+          onClick={handleLoop}
+          title={`Loop: ${loopState}`}
+          aria-label={`Loop: ${loopState}`}
+        >
           {loopState === 'track' ? <Repeat1 size={iconSize} /> : <Repeat size={iconSize} />}
         </button>
       </div>
