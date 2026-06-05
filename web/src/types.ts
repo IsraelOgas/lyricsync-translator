@@ -63,6 +63,16 @@ export interface Settings {
   cinemaMode: boolean;
 }
 
+/** Subset of stored song for list endpoints — no lyric data. */
+export interface SongSummary {
+  id: string;
+  hash_key: string;
+  artist: string;
+  title: string;
+  album?: string;
+  created_at: string;
+}
+
 export const DEFAULT_SETTINGS: Settings = {
   fontSize: 22,
   showRomanization: true,

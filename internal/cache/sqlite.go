@@ -9,8 +9,8 @@ import (
 	"path"
 	"time"
 
-	_ "modernc.org/sqlite"
 	"github.com/google/uuid"
+	_ "modernc.org/sqlite"
 )
 
 type Store struct {
@@ -101,7 +101,7 @@ func (s *Store) GetSongByHash(hashKey string) (*Song, error) {
 	if err != nil {
 		return nil, err
 	}
-	song.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
+	song.CreatedAt, _ = time.Parse("2026-01-01 13:00:00", createdAt)
 	return &song, nil
 }
 
@@ -210,6 +210,37 @@ func (s *Store) GetSongOffset(hashKey string) (int, error) {
 		return 0, nil
 	}
 	return offset, err
+}
+
+func (s *Store) ListSongs(search string) ([]Song, error) {
+	rows, err := s.db.Query(
+		`SELECT id, hash_key, artist, title, album, duration_ms, offset_ms, source, created_at
+		 FROM songs
+		 WHERE ? = '' OR artist LIKE ? OR title LIKE ? OR album LIKE ?
+		 ORDER BY created_at DESC`,
+		search, "%"+search+"%", "%"+search+"%", "%"+search+"%",
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var songs []Song
+	for rows.Next() {
+		var song Song
+		var createdAt string
+		err := rows.Scan(&song.ID, &song.HashKey, &song.Artist, &song.Title, &song.Album,
+			&song.DurationMs, &song.OffsetMs, &song.Source, &createdAt)
+		if err != nil {
+			return nil, err
+		}
+		song.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", createdAt)
+		songs = append(songs, song)
+	}
+	if songs == nil {
+		songs = []Song{}
+	}
+	return songs, rows.Err()
 }
 
 func (s *Store) UpdateSongOffset(hashKey string, offsetMs int) error {

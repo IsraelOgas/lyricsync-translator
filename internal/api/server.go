@@ -92,6 +92,7 @@ func NewServer(
 
 	r := chi.NewRouter()
 	r.Get("/api/now-playing", s.handleNowPlaying)
+	r.Get("/api/songs", s.handleListSongs)
 	r.Get("/api/songs/{hash}/lyrics", s.handleGetLyrics)
 	r.Get("/api/lyrics/stream", s.handleSSE)
 	r.Get("/api/config", s.handleGetConfig)

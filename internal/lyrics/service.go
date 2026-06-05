@@ -84,8 +84,12 @@ func (s *Service) ResolveSong(ctx context.Context, artist, title, album string) 
 	var cacheLines []cache.LyricLine
 	var origTexts []string
 	for i, l := range result.Lines {
-		timeMs := new(int)
-		*timeMs = l.TimeMs
+		var timeMs *int
+		if l.TimeMs != nil {
+			t := new(int)
+			*t = *l.TimeMs
+			timeMs = t
+		}
 		lang := translate.DetectLanguage(l.Text)
 
 		cacheLines = append(cacheLines, cache.LyricLine{
@@ -189,8 +193,12 @@ func buildSongData(song *cache.Song, lines []cache.LyricLine, translations map[i
 	for i, l := range lines {
 		ld := LineData{
 			ID:       l.ID,
-			TimeMs:   l.TimeMs,
 			Original: l.Original,
+		}
+		// Only include timestamp if it's a real positive value.
+		// Zero means "unsynced" (either fresh nil or stale 0 from old cache).
+		if l.TimeMs != nil && *l.TimeMs > 0 {
+			ld.TimeMs = l.TimeMs
 		}
 		if translations != nil {
 			if t, ok := translations[l.ID]; ok {

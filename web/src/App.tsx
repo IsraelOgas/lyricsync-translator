@@ -9,6 +9,7 @@ import { LyricsViewer } from './components/LyricsViewer';
 import { SettingsPanel } from './components/SettingsPanel';
 import { PlayerBar } from './components/PlayerBar';
 import { HelpDialog } from './components/HelpDialog';
+import { SavedSongsView } from './components/SavedSongsView';
 import ErrorBoundary from './components/ErrorBoundary';
 import styles from './App.module.css';
 
@@ -17,6 +18,7 @@ const App: React.FC = () => {
   const { settings, updateSetting } = useSettings();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [view, setView] = useState<'now-playing' | 'saved-songs'>('now-playing');
   const coverColor = useCoverColor(track?.cover_art_url);
 
   const handleOpenHelp = useCallback(() => setHelpOpen(true), []);
@@ -46,20 +48,26 @@ const App: React.FC = () => {
           onUpdateOffset={handleUpdateOffset}
         />
         <HelpDialog open={helpOpen} onClose={() => setHelpOpen(false)} />
-        <NowPlayingBar track={track} status={status} />
-        <LyricsViewer
-          lines={lines}
-          positionMs={positionMs}
-          offsetMs={offsetMs}
-          paused={paused}
-          notFound={notFound}
-          fetchingLyrics={fetchingLyrics}
-          translating={translating}
-          lyricsError={lyricsError}
-          onRetry={handleRetryLyrics}
-          showRomanization={settings.showRomanization}
-        />
-        <PlayerBar track={track} status={status} positionMs={positionMs} />
+        <NowPlayingBar track={track} status={status} view={view} onViewChange={setView} />
+        {view === 'now-playing' ? (
+          <>
+            <LyricsViewer
+              lines={lines}
+              positionMs={positionMs}
+              offsetMs={offsetMs}
+              paused={paused}
+              notFound={notFound}
+              fetchingLyrics={fetchingLyrics}
+              translating={translating}
+              lyricsError={lyricsError}
+              onRetry={handleRetryLyrics}
+              showRomanization={settings.showRomanization}
+            />
+            <PlayerBar track={track} status={status} positionMs={positionMs} />
+          </>
+        ) : (
+          <SavedSongsView showRomanization={settings.showRomanization} />
+        )}
         <button
           className={styles.helpFab}
           onClick={() => setHelpOpen(true)}

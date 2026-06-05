@@ -79,13 +79,15 @@
 }
 
 .romanized {
-  font-size: 14px;
+  font-size: calc(var(--font-size-lyrics) * 0.58);
+  font-family: var(--font-family-lyrics);
   color: var(--color-romanization);
   margin: 4px 0 0;
 }
 
 .translated {
-  font-size: 14px;
+  font-size: calc(var(--font-size-lyrics) * 0.68);
+  font-family: var(--font-family-lyrics);
   color: var(--color-translation);
   margin: 4px 0 0;
   font-style: italic;

@@ -1,7 +1,7 @@
 .bar {
   display: flex;
-  /* justify-content: space-between; */
   align-items: center;
+  position: relative;
   padding: 12px 20px;
   background: linear-gradient(180deg, var(--color-surface-alt) 0%, var(--color-surface-gradient) 100%);
   border-bottom: 1px solid var(--color-border);
@@ -23,6 +23,9 @@
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+  max-width: 35%;
+  position: relative;
+  z-index: 2;
 }
 
 .title {
@@ -81,6 +84,40 @@
   border-radius: 4px;
   background: var(--color-muted);
   animation: lyricsync-pulse 1.5s ease-in-out infinite;
+}
+
+.viewTabs {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 0;
+  z-index: 1;
+}
+
+.viewTab {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 14px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--color-text-dim);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: color 0.2s ease, border-color 0.2s ease;
+  white-space: nowrap;
+}
+
+.viewTab:hover {
+  color: var(--color-text);
+}
+
+.viewTabActive {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
 }
 
 :global(:root[data-cinema]) .bar {

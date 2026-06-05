@@ -61,7 +61,7 @@ func ParseLRC(lrcText string) ([]LyricLine, error) {
 			timeMs := minutes*60*1000 + seconds*1000 + millis
 
 			lines = append(lines, LyricLine{
-				TimeMs: timeMs,
+				TimeMs: &timeMs,
 				Text:   text,
 			})
 		}

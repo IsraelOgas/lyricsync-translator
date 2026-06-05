@@ -14,10 +14,12 @@ interface Props {
   lyricsError?: string | null;
   onRetry?: () => void;
   showRomanization?: boolean;
+  /** When true, suppresses position sync and click-to-seek for static display. */
+  staticMode?: boolean;
 }
 
 
-export const LyricsViewer: React.FC<Props> = ({ lines, positionMs, offsetMs, paused, notFound, fetchingLyrics, translating, lyricsError, onRetry, showRomanization = true }) => {
+export const LyricsViewer: React.FC<Props> = ({ lines, positionMs, offsetMs, paused, notFound, fetchingLyrics, translating, lyricsError, onRetry, showRomanization = true, staticMode = false }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [activeIdx, setActiveIdx] = useState(-1);
 
@@ -25,14 +27,19 @@ export const LyricsViewer: React.FC<Props> = ({ lines, positionMs, offsetMs, pau
   const effectiveMs = positionMs + offsetMs;
 
   useEffect(() => {
-    if (lines.length === 0 || paused) return;
+    if (staticMode || lines.length === 0 || paused) return;
 
     const syncedLines = lines
       .map((l, i) => ({ ...l, origIdx: i }))
-      .filter((l) => l.time_ms !== null)
+      .filter((l) => l.time_ms != null)
       .sort((a, b) => (a.time_ms ?? 0) - (b.time_ms ?? 0));
 
     if (syncedLines.length === 0) return;
+
+    // If every timestamp is 0, the lyrics are unsynced (plain text) —
+    // either from a fresh fetch (nil → omitted) or stale cache (0 stored as non-nil).
+    // Skip binary search to avoid sticking to the last line.
+    if (syncedLines.every((l) => l.time_ms === 0)) return;
 
     let lo = 0;
     let hi = syncedLines.length - 1;
@@ -52,7 +59,7 @@ export const LyricsViewer: React.FC<Props> = ({ lines, positionMs, offsetMs, pau
   }, [effectiveMs, lines, paused]);
 
   useEffect(() => {
-    if (paused) return;
+    if (staticMode || paused) return;
     const container = containerRef.current;
     if (!container) return;
     const activeEl = container.querySelector('[data-active="true"]');
@@ -96,6 +103,7 @@ export const LyricsViewer: React.FC<Props> = ({ lines, positionMs, offsetMs, pau
   }
 
   const handleLineClick = (timeMs: number) => {
+    if (staticMode) return;
     fetch('/api/player/seek', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

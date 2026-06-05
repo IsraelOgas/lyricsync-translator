@@ -20,7 +20,7 @@ type LyricsResult struct {
 
 // LyricLine is one parsed line with optional timing.
 type LyricLine struct {
-	TimeMs int    `json:"time_ms"`
+	TimeMs *int   `json:"time_ms,omitempty"`
 	Text   string `json:"text"`
 }
 
