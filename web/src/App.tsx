@@ -1,5 +1,4 @@
 import React, { useCallback, useState } from 'react';
-import { HelpCircle, Settings } from 'lucide-react';
 import { usePlayerState } from './hooks/usePlayerState';
 import { useSettings } from './hooks/useSettings';
 import { useCoverColor } from './hooks/useCoverColor';
@@ -63,27 +62,18 @@ const App: React.FC = () => {
               onRetry={handleRetryLyrics}
               showRomanization={settings.showRomanization}
             />
-            <PlayerBar track={track} status={status} positionMs={positionMs} />
+            <PlayerBar
+              track={track}
+              status={status}
+              positionMs={positionMs}
+              onOpenSettings={() => setSettingsOpen(true)}
+              onOpenHelp={() => setHelpOpen(true)}
+            />
           </>
         ) : (
           <SavedSongsView showRomanization={settings.showRomanization} />
         )}
-        <button
-          className={styles.helpFab}
-          onClick={() => setHelpOpen(true)}
-          aria-label="Keyboard shortcuts"
-          title="Keyboard shortcuts (?)"
-        >
-          <HelpCircle size={20} />
-        </button>
-        <button
-          className={styles.settingsFab}
-          onClick={() => setSettingsOpen(true)}
-          aria-label="Open settings"
-          title="Settings"
-        >
-          <Settings size={20} />
-        </button>
+
       </div>
     </ErrorBoundary>
   );

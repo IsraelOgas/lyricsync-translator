@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume1, Volume2, VolumeX } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume1, Volume2, VolumeX, Settings, HelpCircle } from 'lucide-react';
 import type { TrackInfo } from '../types';
 import styles from './PlayerBar.module.css';
 
@@ -7,6 +7,8 @@ interface Props {
   track: TrackInfo | null;
   status: string;
   positionMs: number;
+  onOpenSettings: () => void;
+  onOpenHelp: () => void;
 }
 
 function formatTime(ms: number): string {
@@ -27,7 +29,7 @@ function post(url: string, body?: unknown): void {
 
 const iconSize = 20;
 
-export const PlayerBar: React.FC<Props> = ({ track, status, positionMs }) => {
+export const PlayerBar: React.FC<Props> = ({ track, status, positionMs, onOpenSettings, onOpenHelp }) => {
   const durationMs = track?.duration_ms ?? 0;
   const hasDuration = durationMs > 0;
   const progress = hasDuration ? Math.min(1, Math.max(0, positionMs / durationMs)) : 0;
@@ -178,6 +180,26 @@ export const PlayerBar: React.FC<Props> = ({ track, status, positionMs }) => {
           onChange={handleVolumeChange}
           aria-label="Volume"
         />
+      </div>
+
+      {/* Settings & Help */}
+      <div className={styles.utilRow}>
+        <button
+          className={styles.utilBtn}
+          onClick={onOpenHelp}
+          title="Keyboard shortcuts (?)"
+          aria-label="Keyboard shortcuts"
+        >
+          <HelpCircle size={18} />
+        </button>
+        <button
+          className={styles.utilBtn}
+          onClick={onOpenSettings}
+          title="Settings"
+          aria-label="Open settings"
+        >
+          <Settings size={18} />
+        </button>
       </div>
     </div>
   );

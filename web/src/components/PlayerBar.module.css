@@ -186,6 +186,34 @@
   cursor: pointer;
 }
 
+/* --- Settings & Help --- */
+
+.utilRow {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.utilBtn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.utilBtn:hover {
+  color: var(--color-text-bright);
+  background: var(--color-surface-highlight);
+}
+
 /* --- Cinema mode --- */
 
 :global(:root[data-cinema]) .bar {
@@ -223,4 +251,9 @@
 
 :global(:root[data-cinema]) .volumeSlider::-webkit-slider-thumb {
   background: rgba(255, 255, 255, 0.9);
+}
+
+:global(:root[data-cinema]) .utilBtn:hover {
+  color: var(--color-text-bright);
+  background: rgba(255, 255, 255, 0.08);
 }
