@@ -245,6 +245,32 @@ func SetVolume(playerctlPath string, playerName string, delta float64) error {
 	return exec.Command(playerctlPath, args...).Run()
 }
 
+// GetVolume returns the current player volume as a float between 0.0 and 1.0.
+func GetVolume(playerctlPath string, playerName string) (float64, error) {
+	args := []string{"volume"}
+	if playerName != "" {
+		args = append([]string{"-p", playerName}, args...)
+	}
+	out, err := exec.Command(playerctlPath, args...).Output()
+	if err != nil {
+		return 0, fmt.Errorf("playerctl volume: %w", err)
+	}
+	vol, err := strconv.ParseFloat(strings.TrimSpace(string(out)), 64)
+	if err != nil {
+		return 0, fmt.Errorf("parse volume %q: %w", strings.TrimSpace(string(out)), err)
+	}
+	return vol, nil
+}
+
+// SetAbsoluteVolume sets the player volume to an absolute value between 0.0 and 1.0.
+func SetAbsoluteVolume(playerctlPath string, playerName string, vol float64) error {
+	args := []string{"volume", fmt.Sprintf("%.2f", vol)}
+	if playerName != "" {
+		args = append([]string{"-p", playerName}, args...)
+	}
+	return exec.Command(playerctlPath, args...).Run()
+}
+
 // Shuffle toggles the player shuffle state.
 func Shuffle(playerctlPath string, playerName string) error {
 	args := []string{"shuffle", "Toggle"}

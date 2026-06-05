@@ -102,6 +102,7 @@ func NewServer(
 	r.Post("/api/player/seek", s.handleSeek)
 	r.Post("/api/player/next", s.handleNext)
 	r.Post("/api/player/previous", s.handlePrevious)
+	r.Get("/api/player/volume", s.handleGetVolume)
 	r.Post("/api/player/volume", s.handleVolume)
 	r.Post("/api/player/shuffle", s.handleShuffle)
 	r.Post("/api/player/loop", s.handleLoop)
@@ -260,15 +261,35 @@ func (s *Server) handlePrevious(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(`{"ok":true}`))
 }
 
+func (s *Server) handleGetVolume(w http.ResponseWriter, r *http.Request) {
+	vol, err := player.GetVolume(s.cfg.Player.PlayerctlPath, s.tracker.GetActivePlayer())
+	if err != nil {
+		log.Printf("Error getting volume: %v", err)
+		http.Error(w, `{"error":"failed to get volume"}`, http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	fmt.Fprintf(w, `{"volume":%.2f}`, vol)
+}
+
 func (s *Server) handleVolume(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Delta float64 `json:"delta"`
+		Delta    float64  `json:"delta"`
+		Absolute *float64 `json:"absolute"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, `{"error":"invalid json"}`, http.StatusBadRequest)
 		return
 	}
-	if err := player.SetVolume(s.cfg.Player.PlayerctlPath, s.tracker.GetActivePlayer(), body.Delta); err != nil {
+
+	var err error
+	if body.Absolute != nil {
+		err = player.SetAbsoluteVolume(s.cfg.Player.PlayerctlPath, s.tracker.GetActivePlayer(), *body.Absolute)
+	} else {
+		err = player.SetVolume(s.cfg.Player.PlayerctlPath, s.tracker.GetActivePlayer(), body.Delta)
+	}
+
+	if err != nil {
 		log.Printf("Error setting volume: %v", err)
 		http.Error(w, `{"error":"failed to set volume"}`, http.StatusInternalServerError)
 		return

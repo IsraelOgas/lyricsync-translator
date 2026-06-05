@@ -1,5 +1,5 @@
-import React, { useCallback, useState } from 'react';
-import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume1, Volume2 } from 'lucide-react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume1, Volume2, VolumeX } from 'lucide-react';
 import type { TrackInfo } from '../types';
 import styles from './PlayerBar.module.css';
 
@@ -33,6 +33,24 @@ export const PlayerBar: React.FC<Props> = ({ track, status, positionMs }) => {
   const progress = hasDuration ? Math.min(1, Math.max(0, positionMs / durationMs)) : 0;
   const isPlaying = status === 'playing';
   const [loopState, setLoopState] = useState<string>('none');
+  const [vol, setVol] = useState(0.5);
+  const [muted, setMuted] = useState(false);
+  const prevVol = useRef(0.5);
+  const volumeFetched = useRef(false);
+
+  // Fetch initial volume from backend
+  useEffect(() => {
+    if (volumeFetched.current) return;
+    volumeFetched.current = true;
+    fetch('/api/player/volume')
+      .then(r => r.json())
+      .then(data => {
+        const v = data.volume ?? 0.5;
+        setVol(v);
+        prevVol.current = v;
+      })
+      .catch(() => {});
+  }, []);
 
   const handleProgressClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (!hasDuration) return;
@@ -48,6 +66,28 @@ export const PlayerBar: React.FC<Props> = ({ track, status, positionMs }) => {
       setLoopState((data.loop ?? 'None').toLowerCase());
     } catch { /* ignore */ }
   }, []);
+
+  const toggleMute = useCallback(() => {
+    if (muted) {
+      // Unmute: restore previous volume
+      const restore = prevVol.current > 0 ? prevVol.current : 0.5;
+      setVol(restore);
+      setMuted(false);
+      post('/api/player/volume', { absolute: restore });
+    } else {
+      // Mute
+      prevVol.current = vol;
+      setMuted(true);
+      post('/api/player/volume', { absolute: 0 });
+    }
+  }, [muted, vol]);
+
+  const handleVolumeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = parseFloat(e.target.value);
+    setVol(v);
+    if (muted && v > 0) setMuted(false);
+    post('/api/player/volume', { absolute: v });
+  }, [muted]);
 
   return (
     <div className={styles.bar}>
@@ -88,12 +128,24 @@ export const PlayerBar: React.FC<Props> = ({ track, status, positionMs }) => {
 
       {/* Volume */}
       <div className={styles.volumeRow}>
-        <button className={styles.btnVol} onClick={() => post('/api/player/volume', { delta: -0.05 })} title="Volume down" aria-label="Volume down">
-          <Volume1 size={16} />
+        <button
+          className={styles.btnVol}
+          onClick={toggleMute}
+          title={muted ? 'Unmute' : 'Mute'}
+          aria-label={muted ? 'Unmute' : 'Mute'}
+        >
+          {muted || vol === 0 ? <VolumeX size={18} /> : vol < 0.5 ? <Volume1 size={18} /> : <Volume2 size={18} />}
         </button>
-        <button className={styles.btnVol} onClick={() => post('/api/player/volume', { delta: 0.05 })} title="Volume up" aria-label="Volume up">
-          <Volume2 size={16} />
-        </button>
+        <input
+          type="range"
+          className={styles.volumeSlider}
+          min="0"
+          max="1"
+          step="0.01"
+          value={muted ? 0 : vol}
+          onChange={handleVolumeChange}
+          aria-label="Volume"
+        />
       </div>
     </div>
   );

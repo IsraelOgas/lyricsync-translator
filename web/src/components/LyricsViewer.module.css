@@ -56,8 +56,8 @@
 }
 
 .lineInactive {
-  opacity: 0.3;
-  transform: scale(0.80);
+  opacity: 0.48;
+  transform: scale(0.82);
   transform-origin: center center;
 }
 
@@ -83,12 +83,25 @@
   font-style: italic;
 }
 
-.translatingHint {
-  font-size: 10px;
-  color: var(--color-muted);
-  margin: 2px 0 0;
-  font-style: italic;
-  animation: lyricsync-pulse 1.5s ease-in-out infinite;
+.translatingShimmer {
+  width: 55%;
+  max-width: 200px;
+  height: 6px;
+  margin: 6px auto 0;
+  border-radius: 3px;
+  background: linear-gradient(
+    90deg,
+    var(--color-surface-highlight) 25%,
+    var(--color-muted) 50%,
+    var(--color-surface-highlight) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
 .spinner {
@@ -150,15 +163,20 @@
 /* Cinema mode: text-outline halo for readability on dynamic backgrounds. */
 :global(:root[data-cinema]) .original,
 :global(:root[data-cinema]) .romanized,
-:global(:root[data-cinema]) .translated,
-:global(:root[data-cinema]) .translatingHint {
+:global(:root[data-cinema]) .translated {
   text-shadow:
     0 0 6px rgba(0, 0, 0, 0.95),
     0 0 12px rgba(0, 0, 0, 0.7);
 }
 
-:global(:root[data-cinema]) .translatingHint {
-  color: var(--color-text-bright);
+:global(:root[data-cinema]) .translatingShimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.06) 25%,
+    rgba(255, 255, 255, 0.18) 50%,
+    rgba(255, 255, 255, 0.06) 75%
+  );
+  background-size: 200% 100%;
 }
 
 :global(:root[data-cinema]) .container,

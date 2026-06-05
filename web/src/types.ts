@@ -70,7 +70,7 @@ export const DEFAULT_SETTINGS: Settings = {
   lineSpacing: 1.8,
   theme: 'dark-purple',
   translationColor: '#55aa55',
-  romanizationColor: '#8888cc',
+  romanizationColor: '#a0a0ee',
   targetLang: 'es',
   cinemaMode: false,
 };

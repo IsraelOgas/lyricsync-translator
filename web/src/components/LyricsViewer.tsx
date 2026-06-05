@@ -131,7 +131,7 @@ export const LyricsViewer: React.FC<Props> = ({ lines, positionMs, offsetMs, pau
               <p className={styles.translated}>{line.translated}</p>
             )}
             {pendingTranslation && (
-              <p className={styles.translatingHint}>translating...</p>
+              <div className={styles.translatingShimmer} />
             )}
           </div>
         );
