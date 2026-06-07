@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useSSE } from './useSSE';
+import { apiUrl } from '../api';
 import type { TrackInfo, LyricLineData } from '../types';
 
 export interface UsePlayerStateReturn {
@@ -34,13 +35,13 @@ export function usePlayerState(): UsePlayerStateReturn {
   const paused = status !== 'playing';
 
   const handleTogglePlayPause = useCallback(() => {
-    fetch('/api/player/toggle', { method: 'POST' }).catch(() => {});
+    fetch(apiUrl('/api/player/toggle'), { method: 'POST' }).catch(() => {});
   }, []);
 
   const handleRetryLyrics = useCallback(() => {
     setLyricsError(null);
     setFetchingLyrics(true);
-    fetch('/api/player/toggle', { method: 'POST' }).catch(() => {});
+    fetch(apiUrl('/api/player/toggle'), { method: 'POST' }).catch(() => {});
   }, []);
 
   const handleEvent = useCallback((event: any) => {
@@ -97,7 +98,7 @@ export function usePlayerState(): UsePlayerStateReturn {
   const handleUpdateOffset = useCallback((newOffset: number) => {
     setOffsetMs(newOffset);
     if (songHash) {
-      fetch(`/api/songs/${encodeURIComponent(songHash)}/offset`, {
+      fetch(apiUrl(`/api/songs/${encodeURIComponent(songHash)}/offset`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ offset_ms: Math.round(newOffset) }),

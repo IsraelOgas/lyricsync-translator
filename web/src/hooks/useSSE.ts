@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react';
+import { apiUrl } from '../api';
 
 export function useSSE(onEvent: (event: any) => void) {
   const eventSourceRef = useRef<EventSource | null>(null);
@@ -10,7 +11,7 @@ export function useSSE(onEvent: (event: any) => void) {
       eventSourceRef.current.close();
     }
 
-    const es = new EventSource('/api/lyrics/stream');
+    const es = new EventSource(apiUrl('/api/lyrics/stream'));
     eventSourceRef.current = es;
 
     es.onmessage = (e) => {

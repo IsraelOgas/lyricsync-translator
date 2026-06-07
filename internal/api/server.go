@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"log"
 	"net/http"
-	"os"
-	"path/filepath"
+	"net/http/httputil"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -26,7 +28,9 @@ type Server struct {
 	tranSvc                 *translate.Service
 	lyricsSvc               *lyrics.Service
 	sse                     *SSEBroker
+	router                  chi.Router
 	httpSrv                 *http.Server
+	cancel                  context.CancelFunc
 	lastTrackPayload        []byte
 	lastLyricsPayload       []byte
 	lastTranslationsPayload []byte
@@ -40,6 +44,13 @@ func NewServer(
 	lyricsSvc *lyrics.Service,
 ) *Server {
 	sse := NewSSEBroker()
+	r := chi.NewRouter()
+
+	// CORS: the Wails webview loads from an internal scheme (e.g. wails://)
+	// but makes HTTP requests to the API server. Without CORS headers,
+	// fetch() calls are blocked by the webview.
+	r.Use(corsMiddleware)
+
 	s := &Server{
 		cfg:       cfg,
 		store:     store,
@@ -47,6 +58,7 @@ func NewServer(
 		tranSvc:   tranSvc,
 		lyricsSvc: lyricsSvc,
 		sse:       sse,
+		router:    r,
 	}
 
 	// Register callback: when async translations finish, republish updated lyrics
@@ -90,7 +102,7 @@ func NewServer(
 		s.lastTranslationsPayload = payload
 	}
 
-	r := chi.NewRouter()
+	// API routes
 	r.Get("/api/now-playing", s.handleNowPlaying)
 	r.Get("/api/songs", s.handleListSongs)
 	r.Get("/api/songs/{hash}/lyrics", s.handleGetLyrics)
@@ -110,40 +122,104 @@ func NewServer(
 	r.Post("/api/player/loop", s.handleLoop)
 	r.Get("/api/player/loop", s.handleGetLoop)
 
-	// Serve frontend static files in production
-	webDir := os.Getenv("WEB_DIR")
-	if webDir == "" {
-		webDir = "web/dist"
-	}
-	if absDir, err := filepath.Abs(webDir); err == nil {
-		if info, err := os.Stat(absDir); err == nil && info.IsDir() {
-			fs := http.FileServer(http.Dir(absDir))
-			r.Handle("/*", fs)
-			log.Printf("Serving frontend from %s", absDir)
-		}
-	}
-
-	s.httpSrv = &http.Server{
-		Addr:    cfg.Server.Address(),
-		Handler: r,
-	}
-
 	return s
 }
 
-func (s *Server) Start(ctx context.Context) error {
-	brokerCtx, brokerCancel := context.WithCancel(ctx)
-	defer brokerCancel()
-	s.sse.Start(brokerCtx)
+// EnableEmbeddedAssets registers the SPA catch-all handler on the chi router.
+// Must be called before Start().
+//
+// In production (devServerURL is empty): serves frontend from the embedded
+// web/dist filesystem with SPA fallback and API base URL injection.
+//
+// In dev mode (devServerURL is set): reverse-proxies non-API requests to
+// the Vite dev server so HMR works. API routes (/api/*) are matched by
+// chi before reaching this catch-all, so they still hit the Go backend.
+func (s *Server) EnableEmbeddedAssets(assetsFS fs.FS, apiBase string, devServerURL string) {
+	if devServerURL != "" {
+		s.router.Handle("/*", s.devProxyHandler(devServerURL))
+	} else {
+		s.router.Handle("/*", s.spaHandler(assetsFS, apiBase))
+	}
+}
 
-	go s.pipeTrackerEvents(ctx)
+// devProxyHandler creates a reverse proxy to the Vite dev server.
+// Used in dev mode so HMR works while API routes still hit Go.
+func (s *Server) devProxyHandler(targetURL string) http.HandlerFunc {
+	target, err := url.Parse(targetURL)
+	if err != nil {
+		panic("invalid dev server URL: " + targetURL)
+	}
+	proxy := httputil.NewSingleHostReverseProxy(target)
+	return func(w http.ResponseWriter, r *http.Request) {
+		proxy.ServeHTTP(w, r)
+	}
+}
 
-	fmt.Printf("Server listening on %s\n", s.cfg.Server.Address())
-	return s.httpSrv.ListenAndServe()
+// Handler returns the chi router for use as Wails AssetServer.Handler.
+func (s *Server) Handler() http.Handler {
+	return s.router
+}
+
+// spaHandler serves embedded frontend assets with SPA fallback.
+// If the requested file exists in assetsFS, it is served directly.
+// Otherwise, index.html is served with the API base URL injected via
+// string replacement of the {{.APIBase}} template placeholder.
+func (s *Server) spaHandler(assetsFS fs.FS, apiBase string) http.HandlerFunc {
+	fileServer := http.FileServer(http.FS(assetsFS))
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+
+		// Try to serve the requested file from embedded assets.
+		f, err := assetsFS.Open(strings.TrimPrefix(path, "/"))
+		if err == nil {
+			f.Close()
+			fileServer.ServeHTTP(w, r)
+			return
+		}
+
+		// SPA fallback: serve index.html with API base injected.
+		indexContent, err := fs.ReadFile(assetsFS, "index.html")
+		if err != nil {
+			http.Error(w, "index.html not found in embedded assets", http.StatusInternalServerError)
+			return
+		}
+
+		// Replace the Go template placeholder with the actual API base.
+		content := strings.Replace(string(indexContent), "{{.APIBase}}", apiBase, 1)
+
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Write([]byte(content))
+	}
+}
+
+func (s *Server) Start(ctx context.Context) {
+	s.httpSrv = &http.Server{
+		Addr:    s.cfg.Server.Address(),
+		Handler: s.router,
+	}
+
+	sseCtx, cancel := context.WithCancel(ctx)
+	s.cancel = cancel
+	s.sse.Start(sseCtx)
+	go s.pipeTrackerEvents(sseCtx)
+
+	go func() {
+		fmt.Printf("Server listening on %s\n", s.cfg.Server.Address())
+		if err := s.httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Printf("Server error: %v", err)
+		}
+	}()
 }
 
 func (s *Server) Shutdown(ctx context.Context) error {
-	return s.httpSrv.Shutdown(ctx)
+	if s.cancel != nil {
+		s.cancel()
+	}
+	if s.httpSrv != nil {
+		return s.httpSrv.Shutdown(ctx)
+	}
+	return nil
 }
 
 func (s *Server) pipeTrackerEvents(ctx context.Context) {
@@ -343,4 +419,22 @@ func (s *Server) handleGetLoop(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"loop": state})
+}
+
+// corsMiddleware adds permissive CORS headers for the Wails webview.
+// The webview loads pages from an internal scheme (wails://) but
+// makes real HTTP requests to the API server, which are cross-origin.
+func corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }

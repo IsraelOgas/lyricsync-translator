@@ -26,7 +26,7 @@ rules:
     test_command: "go test ./..."
   verify:
     test_command: "go test ./..."
-    build_command: "go build ./cmd/lyricsync/ && cd web && pnpm build"
+    build_command: "go build . && cd web && pnpm build"
     coverage_threshold: 0
   archive:
     - Warn before merging destructive deltas

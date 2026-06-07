@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import type { Settings } from '../types';
+import { apiUrl } from '../api';
 
 interface Props {
   settingsOpen: boolean;
@@ -13,7 +14,7 @@ interface Props {
 
 /** Fire-and-forget POST helper — never throws. */
 function post(url: string, body?: unknown): void {
-  fetch(url, {
+  fetch(apiUrl(url), {
     method: 'POST',
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
     body: body ? JSON.stringify(body) : undefined,
@@ -33,11 +34,19 @@ export function useKeyboardShortcuts({
 }: Props) {
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      // Escape always works — closes settings panel
+      // Escape always works: closes settings panel or exits cinema fullscreen.
       if (e.key === 'Escape') {
         if (settingsOpen) {
           e.preventDefault();
           setSettingsOpen(false);
+          return;
+        }
+        // Escape fallback for cinema mode — covers WebKitGTK (Linux) edge cases
+        // where Wails native Escape handling may not fire.
+        if (settings.cinemaMode) {
+          e.preventDefault();
+          window.runtime?.WindowUnfullscreen();
+          return;
         }
         return;
       }
@@ -89,7 +98,7 @@ export function useKeyboardShortcuts({
         case 'M':
           e.preventDefault();
           // Toggle mute: read current volume, set to 0 or restore to 0.5
-          fetch('/api/player/volume')
+          fetch(apiUrl('/api/player/volume'))
             .then(r => r.json())
             .then(data => {
               const vol = data.volume ?? 0.5;
@@ -132,4 +141,15 @@ export function useKeyboardShortcuts({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [settingsOpen, setSettingsOpen, settings, updateSetting, positionMs, handleTogglePlayPause, onOpenHelp]);
+
+  // Sync cinemaMode when native fullscreen exits (belt and suspenders with Escape fallback).
+  useEffect(() => {
+    function handleFullscreenChange() {
+      if (!document.fullscreenElement && settings.cinemaMode) {
+        updateSetting('cinemaMode', false);
+      }
+    }
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, [settings.cinemaMode, updateSetting]);
 }

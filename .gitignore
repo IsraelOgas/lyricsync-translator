@@ -1,14 +1,21 @@
 # Build output
 dist/
+bin/
 
-# Go
+# Go binaries
+lyricsync
 lyricsync-translator
 *.exe
 *.test
 *.out
 
+# Wails generated
+web/wailsjs/
+web/package.json.md5
+
 # Node / Vite
 node_modules/
+web/dist/
 
 # IDE
 .idea/
@@ -20,10 +27,14 @@ node_modules/
 .DS_Store
 Thumbs.db
 
-# temporary files
+# Temporary files
 tmp/
 
-# env files
+# Env files
 .env
 .env.local
 .env.*.local
+
+# AI agent caches (local only)
+.atl/
+.engram/

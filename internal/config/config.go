@@ -207,3 +207,70 @@ func findConfig() string {
 func (s ServerConfig) Address() string {
 	return fmt.Sprintf("%s:%d", s.Host, s.Port)
 }
+
+// APIBase returns the full HTTP base URL for API calls.
+func (s ServerConfig) APIBase() string {
+	return fmt.Sprintf("http://%s:%d", s.Host, s.Port)
+}
+
+// WindowConfig stores persisted window position, size, and fullscreen state.
+type WindowConfig struct {
+	X          int  `yaml:"x"`
+	Y          int  `yaml:"y"`
+	Width      int  `yaml:"width"`
+	Height     int  `yaml:"height"`
+	Fullscreen bool `yaml:"fullscreen"`
+}
+
+// windowStatePath returns ~/.lyricsync/window-state.yaml.
+func windowStatePath() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("getting home dir: %w", err)
+	}
+	return filepath.Join(home, ".lyricsync", "window-state.yaml"), nil
+}
+
+// LoadWindowState reads window state from ~/.lyricsync/window-state.yaml.
+// Returns defaults (centered 1024×768) if the file doesn't exist.
+func LoadWindowState() (*WindowConfig, error) {
+	path, err := windowStatePath()
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return &WindowConfig{Width: 1024, Height: 768}, nil
+		}
+		return nil, fmt.Errorf("reading window state: %w", err)
+	}
+
+	var wc WindowConfig
+	if err := yaml.Unmarshal(data, &wc); err != nil {
+		return nil, fmt.Errorf("parsing window state: %w", err)
+	}
+	return &wc, nil
+}
+
+// SaveWindowState writes window state to ~/.lyricsync/window-state.yaml.
+// Creates parent directories if they don't exist.
+func SaveWindowState(wc *WindowConfig) error {
+	path, err := windowStatePath()
+	if err != nil {
+		return err
+	}
+
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("creating window state dir: %w", err)
+	}
+
+	data, err := yaml.Marshal(wc)
+	if err != nil {
+		return fmt.Errorf("marshaling window state: %w", err)
+	}
+
+	return os.WriteFile(path, data, 0644)
+}

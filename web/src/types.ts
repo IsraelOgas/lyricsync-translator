@@ -84,3 +84,16 @@ export const DEFAULT_SETTINGS: Settings = {
   targetLang: 'es',
   cinemaMode: false,
 };
+
+// Global declarations for the Wails desktop environment.
+declare global {
+  interface Window {
+    /** Base URL for API calls. Injected by the Go server via template substitution. */
+    __API_BASE__: string;
+    /** Wails v2 runtime — only available inside a Wails WebView. */
+    runtime?: {
+      WindowFullscreen: () => void;
+      WindowUnfullscreen: () => void;
+    };
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "name": "lyricsync",
+  "outputfilename": "lyricsync",
+  "frontend:dir": "web",
+  "frontend:install": "pnpm install",
+  "frontend:build": "pnpm build",
+  "frontend:dev:watcher": "pnpm dev",
+  "frontend:dev:serverUrl": "http://localhost:5173",
+  "build:dir": ".",
+  "build:tags": "webkit2_41",
+  "author": {
+    "name": "",
+    "email": ""
+  }
+}

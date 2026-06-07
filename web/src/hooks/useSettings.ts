@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Settings, DEFAULT_SETTINGS } from '../types';
+import { apiUrl } from '../api';
 
 const FONT_FAMILIES: Record<Settings['fontFamily'], string> = {
   sans: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
@@ -46,10 +47,11 @@ function applySettings(settings: Settings): void {
   root.style.setProperty('--color-translation', settings.translationColor);
   root.setAttribute('data-theme', settings.theme);
 
+  // Native fullscreen via Wails runtime (guarded — only active inside Wails WebView).
   if (settings.cinemaMode) {
-    root.setAttribute('data-cinema', '');
+    window.runtime?.WindowFullscreen();
   } else {
-    root.removeAttribute('data-cinema');
+    window.runtime?.WindowUnfullscreen();
   }
 }
 
@@ -78,7 +80,7 @@ export function useSettings(): UseSettingsReturn {
 
       // Sync target language to backend
       if (key === 'targetLang') {
-        fetch('/api/config', {
+        fetch(apiUrl('/api/config'), {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ target_lang: value }),
