@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { usePlayerState } from './hooks/usePlayerState';
 import { useSettings } from './hooks/useSettings';
 import { useCoverColor } from './hooks/useCoverColor';
@@ -11,6 +12,7 @@ import { HelpDialog } from './components/HelpDialog';
 import { SavedSongsView } from './components/SavedSongsView';
 import ErrorBoundary from './components/ErrorBoundary';
 import { apiUrl } from './api';
+import type { Settings } from './types';
 import styles from './App.module.css';
 
 const App: React.FC = () => {
@@ -48,6 +50,20 @@ const App: React.FC = () => {
 
   const handleOpenHelp = useCallback(() => setHelpOpen(true), []);
 
+  // Wrap updateSetting to use View Transitions API when toggling cinema mode.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleUpdateSetting = useCallback((key: keyof Settings, value: any) => {
+    if (key === 'cinemaMode' && 'startViewTransition' in document) {
+      document.startViewTransition(() => {
+        flushSync(() => {
+          updateSetting(key, value);
+        });
+      });
+    } else {
+      updateSetting(key, value);
+    }
+  }, [updateSetting]);
+
   const handleUpdateDeepseekKey = useCallback((apiKey: string) => {
     fetch(apiUrl('/api/config/provider'), {
       method: 'PUT',
@@ -78,7 +94,7 @@ const App: React.FC = () => {
         <SettingsPanel
           isOpen={settingsOpen}
           settings={settings}
-          onUpdateSetting={updateSetting}
+          onUpdateSetting={handleUpdateSetting}
           onClose={() => setSettingsOpen(false)}
           offsetMs={offsetMs}
           onUpdateOffset={handleUpdateOffset}
@@ -86,7 +102,26 @@ const App: React.FC = () => {
           onUpdateDeepseekKey={handleUpdateDeepseekKey}
         />
         <HelpDialog open={helpOpen} onClose={() => setHelpOpen(false)} />
-        <NowPlayingBar track={track} status={status} view={view} onViewChange={setView} />
+        {!settings.cinemaMode && <NowPlayingBar track={track} status={status} view={view} onViewChange={setView} />}
+
+        {/* Floating track info — only in cinema mode */}
+        {settings.cinemaMode && track && (
+          <div className={styles.cinemaTrackInfo}>
+            {track.cover_art_url && (
+              <img
+                className={styles.cinemaCover}
+                src={track.cover_art_url}
+                alt=""
+                onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              />
+            )}
+            <div className={styles.cinemaMeta}>
+              <span className={styles.cinemaTitle}>{track.title}</span>
+              <span className={styles.cinemaArtist}>{track.artist}</span>
+              {track.album && <span className={styles.cinemaAlbum}>{track.album}</span>}
+            </div>
+          </div>
+        )}
         {view === 'now-playing' ? (
           <>
             <LyricsViewer
@@ -101,16 +136,16 @@ const App: React.FC = () => {
               onRetry={handleRetryLyrics}
               showRomanization={settings.showRomanization}
             />
-            <PlayerBar
+            {!settings.cinemaMode && <PlayerBar
               track={track}
               status={status}
               positionMs={positionMs}
               onOpenSettings={() => setSettingsOpen(true)}
               onOpenHelp={() => setHelpOpen(true)}
-            />
+            />}
           </>
         ) : (
-          <SavedSongsView showRomanization={settings.showRomanization} />
+          !settings.cinemaMode && <SavedSongsView showRomanization={settings.showRomanization} />
         )}
 
       </div>
