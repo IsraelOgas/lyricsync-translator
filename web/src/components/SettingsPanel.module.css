@@ -81,6 +81,17 @@
   color: var(--color-muted);
   text-transform: uppercase;
   letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.configuredBadge {
+  font-size: 10px;
+  font-weight: 500;
+  color: #55aa55;
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 .sliderRow {
@@ -203,4 +214,52 @@
   height: 20px;
   accent-color: var(--color-primary);
   cursor: pointer;
+}
+
+.inputRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.textInput {
+  flex: 1;
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  font-size: 13px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-family: monospace;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.textInput:focus {
+  border-color: var(--color-primary);
+}
+
+.textInput::placeholder {
+  color: var(--color-muted);
+  font-family: inherit;
+}
+
+.iconBtn {
+  background: none;
+  border: 1px solid var(--color-border);
+  color: var(--color-muted);
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.iconBtn:hover {
+  color: var(--color-text);
+  background: var(--color-surface-highlight);
 }

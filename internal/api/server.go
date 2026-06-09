@@ -102,13 +102,27 @@ func NewServer(
 		s.lastTranslationsPayload = payload
 	}
 
+	// Register error callback: emits a lyrics_error event so the frontend
+	// can show an error message instead of leaving the shimmer visible.
+	lyricsSvc.OnError = func(songID string, errMsg string) {
+		log.Printf("OnError callback: song=%s error=%s", songID, errMsg)
+		payload, _ := json.Marshal(map[string]interface{}{
+			"type":  "lyrics_error",
+			"error": fmt.Sprintf("Translation failed: %s", errMsg),
+			"retry": true,
+		})
+		s.sse.Publish(payload)
+	}
+
 	// API routes
 	r.Get("/api/now-playing", s.handleNowPlaying)
 	r.Get("/api/songs", s.handleListSongs)
 	r.Get("/api/songs/{hash}/lyrics", s.handleGetLyrics)
 	r.Get("/api/lyrics/stream", s.handleSSE)
+	r.Post("/api/lyrics/retry", s.handleRetryLyrics)
 	r.Get("/api/config", s.handleGetConfig)
 	r.Put("/api/config", s.handleUpdateConfig)
+	r.Put("/api/config/provider", s.handleUpdateProvider)
 	r.Get("/api/songs/{hash}/offset", s.handleGetOffset)
 	r.Put("/api/songs/{hash}/offset", s.handleUpdateOffset)
 	r.Post("/api/player/toggle", s.handleTogglePlayPause)

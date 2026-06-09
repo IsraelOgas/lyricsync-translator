@@ -12,61 +12,66 @@ import (
 
 // Config is the top-level application configuration.
 type Config struct {
-	Server      ServerConfig      `yaml:"server"`
-	Player      PlayerConfig      `yaml:"player"`
-	Lyrics      LyricsConfig      `yaml:"lyrics"`
-	Translation TranslationConfig `yaml:"translation"`
-	Cache       CacheConfig       `yaml:"cache"`
+	Server      ServerConfig      `yaml:"server" json:"server"`
+	Player      PlayerConfig      `yaml:"player" json:"player"`
+	Lyrics      LyricsConfig      `yaml:"lyrics" json:"lyrics"`
+	Translation TranslationConfig `yaml:"translation" json:"translation"`
+	Cache       CacheConfig       `yaml:"cache" json:"cache"`
+
+	loadedFrom string `yaml:"-" json:"-"` // path the config was loaded from (internal, never serialized)
 }
 
+// LoadedFrom returns the path the config was loaded from, or "" if defaults were used.
+func (c *Config) LoadedFrom() string { return c.loadedFrom }
+
 type ServerConfig struct {
-	Host string `yaml:"host"`
-	Port int    `yaml:"port"`
+	Host string `yaml:"host" json:"host"`
+	Port int    `yaml:"port" json:"port"`
 }
 
 type PlayerConfig struct {
-	PollIntervalMs int    `yaml:"poll_interval_ms"`
-	PlayerctlPath  string `yaml:"playerctl_path"`
+	PollIntervalMs int    `yaml:"poll_interval_ms" json:"poll_interval_ms"`
+	PlayerctlPath  string `yaml:"playerctl_path" json:"playerctl_path"`
 }
 
 type LyricsConfig struct {
-	Provider string       `yaml:"provider"`
-	LRCLib   LRCLibConfig `yaml:"lrclib"`
+	Provider string       `yaml:"provider" json:"provider"`
+	LRCLib   LRCLibConfig `yaml:"lrclib" json:"lrclib"`
 }
 
 type LRCLibConfig struct {
-	BaseURL    string `yaml:"base_url"`
-	TimeoutSec int    `yaml:"timeout_sec"`
+	BaseURL    string `yaml:"base_url" json:"base_url"`
+	TimeoutSec int    `yaml:"timeout_sec" json:"timeout_sec"`
 }
 
 type DeepSeekConfig struct {
-	BaseURL    string `yaml:"base_url"`
-	APIKey     string `yaml:"api_key"`
-	Model      string `yaml:"model"`
-	TimeoutSec int    `yaml:"timeout_sec"`
+	BaseURL    string `yaml:"base_url" json:"base_url"`
+	APIKey     string `yaml:"api_key" json:"api_key"`
+	Model      string `yaml:"model" json:"model"`
+	TimeoutSec int    `yaml:"timeout_sec" json:"timeout_sec"`
 }
 
 type TranslationConfig struct {
-	Provider       string               `yaml:"provider"`
-	TargetLang     string               `yaml:"target_lang"`
-	LibreTranslate LibreTranslateConfig `yaml:"libretranslate"`
-	DeepSeek       DeepSeekConfig       `yaml:"deepseek"`
-	Romanization   RomanizationConfig   `yaml:"romanization"`
+	Provider       string               `yaml:"provider" json:"provider"`
+	TargetLang     string               `yaml:"target_lang" json:"target_lang"`
+	LibreTranslate LibreTranslateConfig `yaml:"libretranslate" json:"libretranslate"`
+	DeepSeek       DeepSeekConfig       `yaml:"deepseek" json:"deepseek"`
+	Romanization   RomanizationConfig   `yaml:"romanization" json:"romanization"`
 }
 
 type LibreTranslateConfig struct {
-	BaseURL    string `yaml:"base_url"`
-	TimeoutSec int    `yaml:"timeout_sec"`
-	APIKey     string `yaml:"api_key"`
+	BaseURL    string `yaml:"base_url" json:"base_url"`
+	TimeoutSec int    `yaml:"timeout_sec" json:"timeout_sec"`
+	APIKey     string `yaml:"api_key" json:"api_key"`
 }
 
 type RomanizationConfig struct {
-	Enabled   bool     `yaml:"enabled"`
-	Languages []string `yaml:"languages"`
+	Enabled   bool     `yaml:"enabled" json:"enabled"`
+	Languages []string `yaml:"languages" json:"languages"`
 }
 
 type CacheConfig struct {
-	DBPath string `yaml:"db_path"`
+	DBPath string `yaml:"db_path" json:"db_path"`
 }
 
 // DefaultConfig returns a configuration with sensible defaults.
@@ -155,6 +160,8 @@ func Load(path string) (*Config, error) {
 		return cfg, nil // no config file found, use defaults + env
 	}
 
+	cfg.loadedFrom = path
+
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("reading config: %w", err)
@@ -180,27 +187,65 @@ func Load(path string) (*Config, error) {
 }
 
 func findConfig() string {
-	candidates := []string{
-		"config.yaml",
-		"config.yml",
+	candidates := []string{"config.yaml", "config.yml"}
+
+	// User config dir takes priority — secrets live here.
+	home, err := os.UserHomeDir()
+	if err == nil {
+		for _, c := range candidates {
+			p := filepath.Join(home, ".config", "lyricsync", c)
+			if _, err := os.Stat(p); err == nil {
+				return p
+			}
+		}
 	}
+
+	// Fall back to repo-local config.yaml (template, no secrets).
 	for _, c := range candidates {
 		if _, err := os.Stat(c); err == nil {
 			return c
 		}
 	}
-	// Check ~/.config/lyricsync/
+
+	return ""
+}
+
+// Save writes the config to the user config directory (~/.config/lyricsync/config.yaml).
+// It never writes back to a repo-local config.yaml to avoid accidentally
+// committing secrets. The repo-local file is treated as a read-only template.
+func Save(cfg *Config) error {
 	home, err := os.UserHomeDir()
 	if err != nil {
+		return fmt.Errorf("getting home dir for config save: %w", err)
+	}
+	dir := filepath.Join(home, ".config", "lyricsync")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("creating config dir: %w", err)
+	}
+	path := filepath.Join(dir, "config.yaml")
+
+	data, err := yaml.Marshal(cfg)
+	if err != nil {
+		return fmt.Errorf("marshaling config: %w", err)
+	}
+	return os.WriteFile(path, data, 0644)
+}
+
+// SanitizedForAPI returns a shallow copy with sensitive fields masked.
+// Safe to serialize as JSON and expose to the frontend.
+func (c *Config) SanitizedForAPI() *Config {
+	safe := *c
+	safe.Translation.DeepSeek.APIKey = maskKey(c.Translation.DeepSeek.APIKey)
+	safe.Translation.LibreTranslate.APIKey = maskKey(c.Translation.LibreTranslate.APIKey)
+	return &safe
+}
+
+// maskKey returns a masked version of an API key for display.
+func maskKey(key string) string {
+	if key == "" {
 		return ""
 	}
-	for _, c := range candidates {
-		p := filepath.Join(home, ".config", "lyricsync", c)
-		if _, err := os.Stat(p); err == nil {
-			return p
-		}
-	}
-	return ""
+	return "••••••••"
 }
 
 // Address returns the listening address string.

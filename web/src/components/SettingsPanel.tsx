@@ -1,5 +1,5 @@
-import React from 'react';
-import { X } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, Eye, EyeOff } from 'lucide-react';
 import type { Settings } from '../types';
 import styles from './SettingsPanel.module.css';
 
@@ -10,6 +10,8 @@ interface Props {
   onClose: () => void;
   offsetMs: number;
   onUpdateOffset: (offsetMs: number) => void;
+  deepseekApiKey: string;
+  onUpdateDeepseekKey: (key: string) => void;
 }
 
 const THEMES: { value: Settings['theme']; label: string }[] = [
@@ -38,8 +40,12 @@ const LANGUAGES: { value: string; label: string }[] = [
   { value: 'zh', label: '中文' },
 ];
 
-export const SettingsPanel: React.FC<Props> = ({ isOpen, settings, onUpdateSetting, onClose, offsetMs, onUpdateOffset }) => {
+export const SettingsPanel: React.FC<Props> = ({ isOpen, settings, onUpdateSetting, onClose, offsetMs, onUpdateOffset, deepseekApiKey, onUpdateDeepseekKey }) => {
   if (!isOpen) return null;
+
+  const [showKey, setShowKey] = useState(false);
+  const [localKey, setLocalKey] = useState('');
+  const [saved, setSaved] = useState(false);
 
   return (
     <>
@@ -116,6 +122,56 @@ export const SettingsPanel: React.FC<Props> = ({ isOpen, settings, onUpdateSetti
                   {l.label}
                 </button>
               ))}
+            </div>
+          </div>
+
+          {/* DeepSeek API Key */}
+          <div className={styles.field}>
+            <label className={styles.label}>
+              DeepSeek API Key
+              {deepseekApiKey && !localKey && (
+                <span className={styles.configuredBadge}>✓ configured</span>
+              )}
+              {saved && (
+                <span className={styles.configuredBadge}>✓ saved</span>
+              )}
+            </label>
+            <div className={styles.inputRow}>
+              <input
+                type={showKey ? 'text' : 'password'}
+                className={styles.textInput}
+                placeholder={deepseekApiKey ? 'Key is configured' : 'Paste your API key'}
+                value={localKey || deepseekApiKey}
+                onFocus={e => {
+                  if (!localKey) e.target.select();
+                }}
+                onChange={e => {
+                  setLocalKey(e.target.value);
+                  setSaved(false);
+                }}
+                onBlur={() => {
+                  if (localKey && localKey !== '••••••••') {
+                    onUpdateDeepseekKey(localKey);
+                    setSaved(true);
+                    setTimeout(() => setSaved(false), 2000);
+                  }
+                }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && localKey && localKey !== '••••••••') {
+                    onUpdateDeepseekKey(localKey);
+                    setSaved(true);
+                    setTimeout(() => setSaved(false), 2000);
+                  }
+                }}
+              />
+              <button
+                type="button"
+                className={styles.iconBtn}
+                onClick={() => setShowKey(!showKey)}
+                aria-label={showKey ? 'Hide API key' : 'Show API key'}
+              >
+                {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
             </div>
           </div>
 

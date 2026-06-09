@@ -22,6 +22,20 @@ interface Props {
 export const LyricsViewer: React.FC<Props> = ({ lines, positionMs, offsetMs, paused, notFound, fetchingLyrics, translating, lyricsError, onRetry, showRomanization = true, staticMode = false }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [activeIdx, setActiveIdx] = useState(-1);
+  const [toastVisible, setToastVisible] = useState(false);
+  const toastTimer = useRef<number>(0);
+
+  // Show toast when error arrives, auto-dismiss after 6s.
+  useEffect(() => {
+    if (lyricsError) {
+      setToastVisible(true);
+      clearTimeout(toastTimer.current);
+      toastTimer.current = setTimeout(() => setToastVisible(false), 6000);
+    } else {
+      setToastVisible(false);
+    }
+    return () => clearTimeout(toastTimer.current);
+  }, [lyricsError]);
 
   // Apply offset to effective position
   const effectiveMs = positionMs + offsetMs;
@@ -111,10 +125,19 @@ export const LyricsViewer: React.FC<Props> = ({ lines, positionMs, offsetMs, pau
     }).catch(() => {}); // silent — playerctl errors are non-critical
   };
 
+  const hasRomanization = lines.some(l => l.romanized);
+
   return (
-    <div ref={containerRef} className={`${styles.container} ${paused ? styles.containerPaused : ''}`}>
+    <div ref={containerRef} className={`${styles.container} ${paused ? styles.containerPaused : ''}`} data-has-romanization={hasRomanization ? 'true' : 'false'}>
       {paused && (
         <div className={styles.pauseBanner}><Pause size={14} /> PAUSED</div>
+      )}
+
+      {toastVisible && lyricsError && (
+        <div className={styles.toast}>
+          <span className={styles.toastText}>{lyricsError}</span>
+          <button className={styles.toastBtn} onClick={onRetry}>Retry</button>
+        </div>
       )}
 
       {lines.map((line, idx) => {

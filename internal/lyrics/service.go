@@ -17,6 +17,7 @@ type Service struct {
 	store    *cache.Store
 	tranSvc  *translate.Service
 	OnUpdate func(songID string) // called after async translations complete
+	OnError  func(songID string, errMsg string) // called when translation fails
 }
 
 // NewService creates a new lyrics orchestrator.
@@ -41,11 +42,13 @@ func (s *Service) ResolveSong(ctx context.Context, artist, title, album string) 
 		targetLang := s.tranSvc.TargetLang()
 		translations, _ := s.store.GetTranslationsBySong(song.ID, targetLang)
 
-		// Retry translation if any lines are missing translations
+		// Retry translation if any lines are missing translations or have empty text
+		// (empty translations happen when the provider failed but we cached them anyway).
 		var missingTexts []string
 		var missingLines []cache.LyricLine
 		for _, l := range lines {
-			if _, ok := translations[l.ID]; !ok {
+			t, ok := translations[l.ID]
+			if !ok || t.TranslatedText == "" {
 				missingLines = append(missingLines, l)
 				missingTexts = append(missingTexts, l.Original)
 			}
@@ -121,6 +124,13 @@ func (s *Service) translateLines(ctx context.Context, storedLines []cache.LyricL
 	results, err := s.tranSvc.ProcessLines(ctx, origTexts)
 	if err != nil {
 		log.Printf("Translation error: %v", err)
+		// Notify frontend even on error so it clears the shimmer.
+		if s.OnUpdate != nil {
+			s.OnUpdate(storedLines[0].SongID)
+		}
+		if s.OnError != nil {
+			s.OnError(storedLines[0].SongID, err.Error())
+		}
 		return
 	}
 

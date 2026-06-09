@@ -35,6 +35,96 @@
   letter-spacing: 2px;
 }
 
+.errorBanner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 10px 20px;
+  background: rgba(255, 80, 80, 0.12);
+  border: 1px solid rgba(255, 80, 80, 0.25);
+  border-radius: 10px;
+  align-self: center;
+}
+
+.errorText {
+  font-size: 13px;
+  color: #ff8888;
+  max-width: 320px;
+  overflow-wrap: break-word;
+}
+
+.errorDismiss {
+  background: rgba(255, 80, 80, 0.15);
+  border: 1px solid rgba(255, 80, 80, 0.3);
+  color: #ff8888;
+  font-size: 12px;
+  padding: 4px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s;
+}
+
+.errorDismiss:hover {
+  background: rgba(255, 80, 80, 0.25);
+}
+
+/* Floating toast for translation errors */
+.toast {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px;
+  background: rgba(30, 30, 40, 0.95);
+  border: 1px solid rgba(255, 100, 100, 0.4);
+  border-radius: 10px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+  animation: toastSlideIn 0.3s ease;
+  max-width: 90vw;
+}
+
+.toastText {
+  font-size: 13px;
+  color: #ffaaaa;
+  overflow-wrap: break-word;
+  max-width: 340px;
+}
+
+.toastBtn {
+  background: rgba(255, 100, 100, 0.15);
+  border: 1px solid rgba(255, 100, 100, 0.35);
+  color: #ffaaaa;
+  font-size: 12px;
+  padding: 4px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+
+.toastBtn:hover {
+  background: rgba(255, 100, 100, 0.28);
+}
+
+@keyframes toastSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
 .line {
   text-align: center;
   padding: 12px 20px;
@@ -83,6 +173,20 @@
   font-family: var(--font-family-lyrics);
   color: var(--color-romanization);
   margin: 4px 0 0;
+}
+
+/* When the song has romanization, make it the primary text and shrink the original. */
+[data-has-romanization="true"] .romanized {
+  font-size: calc(var(--font-size-lyrics) * 1.15);
+  font-weight: 700;
+  margin: 4px 0 0;
+}
+
+[data-has-romanization="true"] .original {
+  font-size: calc(var(--font-size-lyrics) * 0.58);
+  font-weight: 400;
+  opacity: 0.7;
+  color: var(--color-romanization);
 }
 
 .translated {

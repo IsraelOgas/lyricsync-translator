@@ -41,7 +41,7 @@ export function usePlayerState(): UsePlayerStateReturn {
   const handleRetryLyrics = useCallback(() => {
     setLyricsError(null);
     setFetchingLyrics(true);
-    fetch(apiUrl('/api/player/toggle'), { method: 'POST' }).catch(() => {});
+    fetch(apiUrl('/api/lyrics/retry'), { method: 'POST' }).catch(() => {});
   }, []);
 
   const handleEvent = useCallback((event: any) => {

@@ -2,6 +2,7 @@ package translate
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"sync"
 )
@@ -27,6 +28,15 @@ func (s *Service) SetTargetLang(lang string) {
 	defer s.mu.Unlock()
 	s.targetLang = lang
 	log.Printf("translate: target language set to %s", lang)
+}
+
+// SetTranslator replaces the underlying translator at runtime.
+// Safe for concurrent use — holds the write lock during the swap.
+func (s *Service) SetTranslator(t Translator) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.translator = t
+	log.Printf("translate: translator replaced at runtime")
 }
 
 // TargetLang returns the current target language.
@@ -119,7 +129,7 @@ func (s *Service) ProcessLines(ctx context.Context, lines []string) ([]LineResul
 	log.Printf("translate: sending %d lines to provider (target=%s)", n, target)
 	romanized, translated, err := s.translator.TranslateBatch(lines, "auto", target)
 	if err != nil {
-		log.Printf("translate: batch failed: %v", err)
+		return nil, fmt.Errorf("translate batch failed: %w", err)
 	}
 	romanized = padResults(romanized, n)
 	translated = padResults(translated, n)
