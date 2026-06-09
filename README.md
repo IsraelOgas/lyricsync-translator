@@ -117,7 +117,8 @@ Abrí `http://localhost:8090`.
 
 ## Configuración
 
-Creá `config.yaml` (opcional, usa defaults si no existe):
+El `config.yaml` en la raíz del repo es un **template sin secrets**. La app lo usa como fallback inicial.  
+Las keys y configuraciones sensibles se persisten automáticamente en `~/.config/lyricsync/config.yaml`.
 
 ```yaml
 server:
@@ -136,22 +137,29 @@ translation:
   libretranslate:
     base_url: "http://127.0.0.1:5000"
   deepseek:
-    api_key: "${DEEPSEEK_API_KEY}"
+    api_key: ""                     # configurable desde el panel de Settings
     model: "deepseek-chat"
 
 cache:
   db_path: "~/.lyricsync/cache.db"
 ```
 
+### Configuración desde la UI
+
+La API key de DeepSeek se puede configurar desde el panel de **Settings → DeepSeek API Key** sin reiniciar la app. La key se guarda en `~/.config/lyricsync/config.yaml` y se aplica en caliente (hot-reload del cliente).
+
 ### Variables de entorno
 
 | Variable | Default | Uso |
 |---|---|---|
 | `LIBRETRANSLATE_URL` | `http://127.0.0.1:5000` | URL de LibreTranslate |
-| `DEEPSEEK_API_KEY` | — | API key de DeepSeek |
+| `DEEPSEEK_API_KEY` | — | API key de DeepSeek (fallback si no hay en UI) |
 | `LYRIC_HOST` | `127.0.0.1` | Host del servidor |
 | `LYRIC_PORT` | `8090` | Puerto del servidor |
+| `LYRIC_TARGET_LANG` | `es` | Idioma de traducción |
 | `LYRIC_DB_PATH` | `~/.lyricsync/cache.db` | Ruta de la DB |
+
+> **Nota de seguridad**: `GET /api/config` no expone las API keys reales — devuelve `••••••••`. Las keys nunca se escriben en el `config.yaml` del repo, solo en `~/.config/lyricsync/`.
 
 ## Endpoints
 
@@ -159,22 +167,36 @@ cache:
 |---|---|---|
 | GET | `/api/now-playing` | Track actual + estado + posición |
 | GET | `/api/lyrics/stream` | SSE: track, letras, traducciones, posición |
-| GET | `/api/songs` | Listar canciones guardadas (con búsqueda `?q=`) |
+| POST | `/api/lyrics/retry` | Reintentar traducción del track actual |
+| GET | `/api/songs` | Listar canciones guardadas (con búsqueda `?search=`) |
 | GET | `/api/songs/{hash}/lyrics` | Letras cacheadas por hash |
+| GET | `/api/songs/{hash}/offset` | Offset de sincronización |
+| PUT | `/api/songs/{hash}/offset` | Actualizar offset |
 | POST | `/api/player/toggle` | Play/pause del reproductor |
-| GET | `/api/config` | Configuración actual |
-| PUT | `/api/config` | Actualizar configuración |
+| POST | `/api/player/next` | Siguiente track |
+| POST | `/api/player/previous` | Track anterior |
+| POST | `/api/player/seek` | Seek a posición `{position_ms}` |
+| GET | `/api/player/volume` | Volumen actual |
+| POST | `/api/player/volume` | Ajustar volumen `{delta}` o `{absolute}` |
+| GET | `/api/player/shuffle` | Estado de shuffle |
+| POST | `/api/player/shuffle` | Toggle shuffle |
+| GET | `/api/player/loop` | Estado de loop |
+| POST | `/api/player/loop` | Ciclar loop (none → playlist → track) |
+| GET | `/api/config` | Configuración actual (API keys sanitizadas) |
+| PUT | `/api/config` | Actualizar `target_lang` |
+| PUT | `/api/config/provider` | Actualizar API key de provider + hot-reload |
 
 ## Eventos SSE
 
 | Tipo | Dirección | Contenido |
 |---|---|---|
-| `track` | servidor → cliente | Artista, título, álbum, duración |
+| `track` | servidor → cliente | Artista, título, álbum, duración, cover art |
 | `status` | servidor → cliente | `playing`, `paused`, `stopped`, `no_player` |
 | `position` | servidor → cliente | Posición en ms (cada 500ms) |
 | `lyrics_loading` | servidor → cliente | Búsqueda de letras iniciada |
-| `lyrics` | servidor → cliente | Letras + flag `translating` |
-| `translations` | servidor → cliente | Traducciones completadas |
+| `lyrics` | servidor → cliente | Letras + flag `translating` + `not_found` |
+| `lyrics_error` | servidor → cliente | Error al cargar letras o traducir (`error`, `retry`) |
+| `translations` | servidor → cliente | Traducciones completadas (merge con líneas existentes) |
 
 ## Estructura del proyecto
 
@@ -192,11 +214,13 @@ lyricsync-translator/
 │   └── translate/           # LibreTranslate + DeepSeek clients, romanizer
 ├── web/
 │   └── src/
-│       ├── components/      # LyricsViewer, NowPlayingBar, PlayerBar, SavedSongsView
-│       ├── hooks/           # useSSE, usePlayerState, useSettings, useKeyboardShortcuts
-│       ├── App.tsx          # Estado global, handler de eventos
+│       ├── components/      # LyricsViewer, NowPlayingBar, PlayerBar, SettingsPanel, SavedSongsView, HelpDialog, ErrorBoundary
+│       ├── hooks/           # useSSE, usePlayerState, useSettings, useCoverColor, useKeyboardShortcuts
+│       ├── App.tsx          # Estado global, cinema mode, view transitions
+│       ├── App.module.css   # Estilos del layout + cinema track info flotante
 │       ├── main.tsx         # Entry point React
-│       └── types.ts         # Tipos compartidos
+│       ├── api.ts           # Helper apiUrl() para CORS/Wails
+│       └── types.ts         # Tipos compartidos + defaults de settings
 ├── openspec/                # Artefactos SDD (specs, changes)
 ├── Dockerfile
 ├── docker-compose.yml
@@ -206,14 +230,19 @@ lyricsync-translator/
 ## Features
 
 - **App nativa**: empaquetado Wails v2, single binary, sin navegador
-- **Cinema mode**: fullscreen nativo con overlay de letras
+- **Cinema mode**: fullscreen nativo, oculta barras de UI, widget flotante con info del track, View Transitions API para animación suave
+- **Panel de Settings**: fuente, tema (4 temas), colores, espaciado, idioma, offset de sync, API key de DeepSeek con toggle revelar/ocultar
+- **Configuración de API key desde la UI**: hot-reload del cliente DeepSeek sin reiniciar, persistencia en `~/.config/lyricsync/config.yaml`
 - Detección automática de **cualquier reproductor MPRIS** (Spotify, Brave, Chrome, apps)
-- Letras sincronizadas (LRC) con highlight en tiempo real
-- Traducción EN→ES (LibreTranslate o DeepSeek)
-- Romanización de japonés, chino y coreano
+- Letras sincronizadas (LRC) con highlight en tiempo real + click-to-seek
+- Traducción EN→ES (LibreTranslate o DeepSeek) con romanización de japonés, chino y coreano
+- **Romanización prominente**: cuando la canción tiene transliteración, se muestra más grande que el texto original
+- **Toast de error**: notificación flotante con auto-dismiss cuando falla el provider de traducción + botón Retry
+- **Retry inteligente**: reintenta traducciones vacías (API key mala → corregir → siguiente reproducción)
+- Controles del reproductor: play/pause, next/prev, seek, shuffle, loop, volumen con mute
 - Biblioteca de canciones guardadas con búsqueda
-- Pausa sincronizada letras + reproductor
-- SSE con replay de estado al reconectar
+- Atajos de teclado (`?` para ayuda)
+- SSE con replay de estado al reconectar + merge atómico de traducciones
 - Cache SQLite de canciones y traducciones
 - Persistencia de estado de ventana (posición, tamaño, fullscreen)
 - Docker: multi-stage build, LibreTranslate incluido
