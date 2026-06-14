@@ -14,6 +14,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/imov/lyricsync-translator/internal/beat"
 	"github.com/imov/lyricsync-translator/internal/cache"
 	"github.com/imov/lyricsync-translator/internal/config"
 	"github.com/imov/lyricsync-translator/internal/lyrics"
@@ -27,6 +28,7 @@ type Server struct {
 	tracker                 *player.Tracker
 	tranSvc                 *translate.Service
 	lyricsSvc               *lyrics.Service
+	beatDetector            *beat.Detector
 	sse                     *SSEBroker
 	router                  chi.Router
 	httpSrv                 *http.Server
@@ -52,13 +54,14 @@ func NewServer(
 	r.Use(corsMiddleware)
 
 	s := &Server{
-		cfg:       cfg,
-		store:     store,
-		tracker:   tracker,
-		tranSvc:   tranSvc,
-		lyricsSvc: lyricsSvc,
-		sse:       sse,
-		router:    r,
+		cfg:          cfg,
+		store:        store,
+		tracker:      tracker,
+		tranSvc:      tranSvc,
+		lyricsSvc:    lyricsSvc,
+		beatDetector: beat.NewDetector(),
+		sse:          sse,
+		router:       r,
 	}
 
 	// Register callback: when async translations finish, republish updated lyrics
@@ -217,6 +220,7 @@ func (s *Server) Start(ctx context.Context) {
 	s.cancel = cancel
 	s.sse.Start(sseCtx)
 	go s.pipeTrackerEvents(sseCtx)
+	go s.pipeBeatEvents(sseCtx)
 
 	go func() {
 		fmt.Printf("Server listening on %s\n", s.cfg.Server.Address())
@@ -234,6 +238,27 @@ func (s *Server) Shutdown(ctx context.Context) error {
 		return s.httpSrv.Shutdown(ctx)
 	}
 	return nil
+}
+
+func (s *Server) pipeBeatEvents(ctx context.Context) {
+	events := s.beatDetector.Events(ctx)
+	lastPublish := int64(0)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case event, ok := <-events:
+			if !ok {
+				return
+			}
+			// Publish energy updates at ~20Hz to avoid flooding
+			if event.Timestamp-lastPublish >= 50 {
+				lastPublish = event.Timestamp
+				payload, _ := json.Marshal(event)
+				s.sse.Publish(payload)
+			}
+		}
+	}
 }
 
 func (s *Server) pipeTrackerEvents(ctx context.Context) {

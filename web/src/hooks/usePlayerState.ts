@@ -3,6 +3,13 @@ import { useSSE } from './useSSE';
 import { apiUrl } from '../api';
 import type { TrackInfo, LyricLineData } from '../types';
 
+export interface BeatData {
+  energy: number;
+  isOnset: boolean;
+  bpm: number | null;
+  beatPhase: number;
+}
+
 export interface UsePlayerStateReturn {
   track: TrackInfo | null;
   status: string;
@@ -14,6 +21,8 @@ export interface UsePlayerStateReturn {
   paused: boolean;
   lyricsError: string | null;
   offsetMs: number;
+  songHash: string | null;
+  beat: BeatData;
   handleTogglePlayPause: () => void;
   handleRetryLyrics: () => void;
   handleUpdateOffset: (offsetMs: number) => void;
@@ -30,6 +39,7 @@ export function usePlayerState(): UsePlayerStateReturn {
   const [lyricsError, setLyricsError] = useState<string | null>(null);
   const [offsetMs, setOffsetMs] = useState(0);
   const [songHash, setSongHash] = useState<string | null>(null);
+  const [beat, setBeat] = useState<BeatData>({ energy: 0, isOnset: false, bpm: null, beatPhase: 0 });
 
   // Derive paused from player status reported via SSE
   const paused = status !== 'playing';
@@ -90,6 +100,14 @@ export function usePlayerState(): UsePlayerStateReturn {
           }));
         }
         break;
+      case 'beat':
+        setBeat({
+          energy: event.energy ?? 0,
+          isOnset: event.is_onset ?? false,
+          bpm: event.bpm ?? null,
+          beatPhase: event.beat_phase ?? 0,
+        });
+        break;
     }
   }, []);
 
@@ -106,5 +124,5 @@ export function usePlayerState(): UsePlayerStateReturn {
     }
   }, [songHash]);
 
-  return { track, status, positionMs, lines, notFound, fetchingLyrics, translating, paused, lyricsError, offsetMs, handleTogglePlayPause, handleRetryLyrics, handleUpdateOffset };
+  return { track, status, positionMs, lines, notFound, fetchingLyrics, translating, paused, lyricsError, offsetMs, songHash, beat, handleTogglePlayPause, handleRetryLyrics, handleUpdateOffset };
 }

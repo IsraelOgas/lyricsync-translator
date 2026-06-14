@@ -1,12 +1,26 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume1, Volume2, VolumeX, Settings, HelpCircle } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume1, Volume2, VolumeX, Settings, HelpCircle, Music, BarChart3, Activity, Circle, Disc } from 'lucide-react';
 import type { TrackInfo } from '../types';
+import type { BeatData } from '../hooks/usePlayerState';
+import { BeatVisualizer } from './BeatVisualizer';
+import { AdvancedVisualizer } from './AdvancedVisualizer';
+import { useBPM } from '../hooks/useBPM';
 import styles from './PlayerBar.module.css';
+
+type VisMode = 'bars' | 'wave' | 'circular' | 'pulse';
+const VIS_MODES: { key: VisMode; icon: React.ReactNode; label: string }[] = [
+  { key: 'bars', icon: <BarChart3 size={14} />, label: 'Bars' },
+  { key: 'wave', icon: <Activity size={14} />, label: 'Wave' },
+  { key: 'circular', icon: <Disc size={14} />, label: 'Circular' },
+  { key: 'pulse', icon: <Circle size={14} />, label: 'Pulse' },
+];
 
 interface Props {
   track: TrackInfo | null;
   status: string;
   positionMs: number;
+  songHash: string | null;
+  beat: BeatData;
   onOpenSettings: () => void;
   onOpenHelp: () => void;
 }
@@ -29,7 +43,7 @@ function post(url: string, body?: unknown): void {
 
 const iconSize = 20;
 
-export const PlayerBar: React.FC<Props> = ({ track, status, positionMs, onOpenSettings, onOpenHelp }) => {
+export const PlayerBar: React.FC<Props> = ({ track, status, positionMs, songHash, beat, onOpenSettings, onOpenHelp }) => {
   const durationMs = track?.duration_ms ?? 0;
   const hasDuration = durationMs > 0;
   const progress = hasDuration ? Math.min(1, Math.max(0, positionMs / durationMs)) : 0;
@@ -38,6 +52,15 @@ export const PlayerBar: React.FC<Props> = ({ track, status, positionMs, onOpenSe
   const [shuffleOn, setShuffleOn] = useState(false);
   const [vol, setVol] = useState(0.5);
   const [muted, setMuted] = useState(false);
+  // Use backend-detected BPM if available, otherwise allow manual override
+  const detectedBpm = beat.bpm;
+  const [manualBpm, setManualBpm] = useBPM(track, songHash);
+  const bpm = detectedBpm || manualBpm;
+  const setBpm = setManualBpm;
+  const [bpmInput, setBpmInput] = useState('');
+  const [visMode, setVisMode] = useState<VisMode>(() => {
+    try { return (localStorage.getItem('lyricsync:visMode') as VisMode) || 'bars'; } catch { return 'bars'; }
+  });
   const prevVol = useRef(0.5);
   const stateFetched = useRef(false);
 
@@ -113,9 +136,63 @@ export const PlayerBar: React.FC<Props> = ({ track, status, positionMs, onOpenSe
     post('/api/player/volume', { absolute: v });
   }, [muted]);
 
+  const cycleVisMode = useCallback(() => {
+    setVisMode(prev => {
+      const idx = VIS_MODES.findIndex(m => m.key === prev);
+      const next = VIS_MODES[(idx + 1) % VIS_MODES.length].key;
+      try { localStorage.setItem('lyricsync:visMode', next); } catch {}
+      return next;
+    });
+  }, []);
+
+  const tapTimesRef = useRef<number[]>([]);
+  const handleTapTempo = useCallback(() => {
+    const now = performance.now();
+    const taps = tapTimesRef.current;
+    taps.push(now);
+
+    // Keep only last 8 taps
+    while (taps.length > 8) taps.shift();
+
+    if (taps.length < 2) return;
+
+    // If more than 3 seconds since last tap, reset
+    if (now - taps[taps.length - 2] > 3000) {
+      taps.length = 1;
+      return;
+    }
+
+    // Calculate average interval
+    let total = 0;
+    for (let i = 1; i < taps.length; i++) {
+      total += taps[i] - taps[i - 1];
+    }
+    const avgMs = total / (taps.length - 1);
+    const tapBpm = Math.round(60000 / avgMs);
+    if (tapBpm > 0 && tapBpm < 300) {
+      setBpm(tapBpm);
+      setBpmInput(String(tapBpm));
+    }
+  }, [setBpm]);
+
+  const currentVisMode = VIS_MODES.find(m => m.key === visMode) || VIS_MODES[0];
+
   return (
     <div className={styles.bar}>
-      {/* Progress bar */}
+      {/* Advanced Visualizer */}
+      <div className={styles.visRow}>
+        <button
+          className={styles.visModeBtn}
+          onClick={cycleVisMode}
+          title={`Mode: ${currentVisMode.label}`}
+          aria-label={`Visualization mode: ${currentVisMode.label}`}
+        >
+          {currentVisMode.icon}
+        </button>
+        <AdvancedVisualizer bpm={bpm} positionMs={positionMs} isPlaying={isPlaying} mode={visMode} beat={beat} />
+      </div>
+
+      {/* Progress bar + Beat visualizer */}
       <div className={styles.progressRow}>
         <span className={styles.time}>{formatTime(positionMs)}</span>
         <div
@@ -129,6 +206,48 @@ export const PlayerBar: React.FC<Props> = ({ track, status, positionMs, onOpenSe
           />
         </div>
         <span className={styles.time}>{hasDuration ? formatTime(durationMs) : '--:--'}</span>
+        <BeatVisualizer bpm={bpm} positionMs={positionMs} isPlaying={isPlaying} />
+        <div className={styles.bpmControl}>
+          <Music size={14} className={styles.bpmIcon} />
+          <button
+            className={styles.tapBtn}
+            onClick={handleTapTempo}
+            title="Tap tempo"
+            aria-label="Tap tempo"
+          >
+            <span className={styles.tapDot} />
+          </button>
+          <input
+            type="number"
+            className={styles.bpmInput}
+            value={bpmInput}
+            onChange={(e) => setBpmInput(e.target.value)}
+            onBlur={() => {
+              const val = parseInt(bpmInput, 10);
+              if (!isNaN(val) && val > 0 && val < 300) setBpm(val);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                const val = parseInt(bpmInput, 10);
+                if (!isNaN(val) && val > 0 && val < 300) setBpm(val);
+              }
+            }}
+            placeholder="BPM"
+            min="1"
+            max="299"
+            title="Set BPM for beat visualization"
+          />
+          {bpm && (
+            <button
+              className={styles.bpmClear}
+              onClick={() => { setBpm(null); setBpmInput(''); }}
+              title="Clear BPM"
+              aria-label="Clear BPM"
+            >
+              ×
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Controls */}
