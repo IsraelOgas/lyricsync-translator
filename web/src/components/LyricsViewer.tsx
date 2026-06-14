@@ -40,6 +40,9 @@ export const LyricsViewer: React.FC<Props> = ({ lines, positionMs, offsetMs, pau
   // Apply offset to effective position
   const effectiveMs = positionMs + offsetMs;
 
+  // Karaoke progress: how far we are through the current active line (0..1)
+  const [karaokeProgress, setKaraokeProgress] = useState(0);
+
   useEffect(() => {
     if (staticMode || lines.length === 0 || paused) return;
 
@@ -70,6 +73,15 @@ export const LyricsViewer: React.FC<Props> = ({ lines, positionMs, offsetMs, pau
     }
 
     setActiveIdx(syncedLines[best].origIdx);
+
+    // Calculate karaoke progress within the active line
+    const activeLine = syncedLines[best];
+    const nextLine = syncedLines.find((l, i) => i > best && l.time_ms != null);
+    const lineStart = activeLine.time_ms ?? 0;
+    const lineEnd = nextLine?.time_ms ?? (lineStart + 4000); // fallback ~4s
+    const duration = Math.max(lineEnd - lineStart, 1);
+    const progress = Math.min(1, Math.max(0, (effectiveMs - lineStart) / duration));
+    setKaraokeProgress(progress);
   }, [effectiveMs, lines, paused]);
 
   useEffect(() => {
@@ -150,6 +162,7 @@ export const LyricsViewer: React.FC<Props> = ({ lines, positionMs, offsetMs, pau
             key={line.id || idx}
             data-active={isActive}
             className={`${styles.line} ${isActive ? styles.lineActive : styles.lineInactive} ${isClickable ? styles.clickable : ''}`}
+            style={isActive ? { '--karaoke-progress': karaokeProgress } as React.CSSProperties : undefined}
             onClick={isClickable ? () => handleLineClick(line.time_ms!) : undefined}
             title={isClickable ? (isInstrumental ? 'Instrumental' : 'Click to jump to this verse') : undefined}
           >

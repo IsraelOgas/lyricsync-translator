@@ -8,6 +8,7 @@ import { NowPlayingBar } from './components/NowPlayingBar';
 import { LyricsViewer } from './components/LyricsViewer';
 import { SettingsPanel } from './components/SettingsPanel';
 import { PlayerBar } from './components/PlayerBar';
+import { CinemaProgressBar } from './components/CinemaProgressBar';
 import { HelpDialog } from './components/HelpDialog';
 import { SavedSongsView } from './components/SavedSongsView';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -91,6 +92,16 @@ const App: React.FC = () => {
         className={styles.app}
         style={settings.cinemaMode && coverColor ? { backgroundColor: coverColor } : undefined}
       >
+        {/* Animated karaoke background — only in cinema mode */}
+        {settings.cinemaMode && coverColor && (
+          <div className={styles.cinemaBg}>
+            <div className={`${styles.cinemaOrb} ${styles.cinemaOrb1}`} style={{ backgroundColor: coverColor }} />
+            <div className={`${styles.cinemaOrb} ${styles.cinemaOrb2}`} style={{ backgroundColor: coverColor }} />
+            <div className={`${styles.cinemaOrb} ${styles.cinemaOrb3}`} style={{ backgroundColor: coverColor }} />
+            <div className={styles.cinemaVignette} />
+          </div>
+        )}
+
         <SettingsPanel
           isOpen={settingsOpen}
           settings={settings}
@@ -148,6 +159,10 @@ const App: React.FC = () => {
           !settings.cinemaMode && <SavedSongsView showRomanization={settings.showRomanization} />
         )}
 
+        {/* Cinema mode: full-width progress bar at bottom */}
+        {settings.cinemaMode && (
+          <CinemaProgressBar track={track} positionMs={positionMs} />
+        )}
       </div>
     </ErrorBoundary>
   );

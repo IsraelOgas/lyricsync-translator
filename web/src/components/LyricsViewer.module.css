@@ -11,6 +11,8 @@
   flex-direction: column;
   gap: 24px;
   transition: opacity 0.3s ease;
+  position: relative;
+  z-index: 2;
 }
 
 .containerPaused {
@@ -143,6 +145,30 @@
 
 .lineActive {
   /* opacity: 1 is the browser default — no override needed */
+}
+
+/* Karaoke gradient sweep — active line text fills with color from left to right */
+.lineActive .original {
+  background: linear-gradient(
+    90deg,
+    var(--color-primary) calc(var(--karaoke-progress, 0) * 100%),
+    var(--color-text-bright) calc(var(--karaoke-progress, 0) * 100%)
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Romanization mode: sweep the romanized text instead */
+[data-has-romanization="true"] .lineActive .romanized {
+  background: linear-gradient(
+    90deg,
+    var(--color-primary) calc(var(--karaoke-progress, 0) * 100%),
+    var(--color-romanization) calc(var(--karaoke-progress, 0) * 100%)
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .lineInactive {
