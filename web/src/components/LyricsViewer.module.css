@@ -130,7 +130,7 @@
 .line {
   text-align: center;
   padding: 12px 20px;
-  transition: all 0.3s ease;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   line-height: var(--line-spacing-lyrics);
 }
 
@@ -144,7 +144,20 @@
 }
 
 .lineActive {
-  /* opacity: 1 is the browser default — no override needed */
+  opacity: 1;
+  transform: scale(1);
+  animation: lineEnter 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes lineEnter {
+  from {
+    opacity: 0.6;
+    transform: translateY(8px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 /* Karaoke gradient sweep — active line text fills with color from left to right */
@@ -171,10 +184,17 @@
   -webkit-text-fill-color: transparent;
 }
 
+/* Subtle glow on active line — just enough for depth, not enough to blur */
+.lineActive .original,
+.lineActive .romanized {
+  text-shadow: 0 0 12px rgba(136, 136, 204, 0.25);
+}
+
 .lineInactive {
   opacity: 0.48;
   transform: scale(0.76);
   transform-origin: center center;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .original {
@@ -192,6 +212,23 @@
   margin: 0;
   opacity: 0.7;
   letter-spacing: 6px;
+  animation: instrumentalPulse 2s ease-in-out infinite;
+}
+
+.lineActive .instrumental {
+  animation: instrumentalActive 1.5s ease-in-out infinite;
+  opacity: 1;
+  text-shadow: 0 0 8px rgba(136, 136, 204, 0.2);
+}
+
+@keyframes instrumentalPulse {
+  0%, 100% { opacity: 0.5; transform: scale(0.98); }
+  50% { opacity: 0.8; transform: scale(1); }
+}
+
+@keyframes instrumentalActive {
+  0%, 100% { opacity: 0.8; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.05); }
 }
 
 .romanized {
