@@ -9,6 +9,7 @@ import { LyricsViewer } from './components/LyricsViewer';
 import { SettingsPanel } from './components/SettingsPanel';
 import { PlayerBar } from './components/PlayerBar';
 import { CinemaProgressBar } from './components/CinemaProgressBar';
+import { CinemaParticles } from './components/CinemaParticles';
 import { HelpDialog } from './components/HelpDialog';
 import { SavedSongsView } from './components/SavedSongsView';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -86,18 +87,55 @@ const App: React.FC = () => {
     onOpenHelp: handleOpenHelp,
   });
 
+  // Calculate song progress for hue shift (0..1)
+  const songProgress = track?.duration_ms ? Math.min(1, Math.max(0, positionMs / track.duration_ms)) : 0;
+  // Detect near end for fade-to-black (last 3 seconds)
+  const nearEnd = track?.duration_ms ? positionMs > track.duration_ms - 3000 && positionMs < track.duration_ms : false;
+  // Hue shift: 0deg at start → 30deg at end (subtle warm shift)
+  const hueShift = songProgress * 30;
+
   return (
     <ErrorBoundary>
       <div
-        className={styles.app}
-        style={settings.cinemaMode && coverColor ? { backgroundColor: coverColor } : undefined}
+        className={`${styles.app} ${nearEnd ? styles.nearEnd : ''}`}
+        style={settings.cinemaMode && coverColor ? {
+          backgroundColor: coverColor,
+          filter: `hue-rotate(${hueShift}deg)`,
+        } : undefined}
       >
         {/* Animated karaoke background — only in cinema mode */}
-        {settings.cinemaMode && coverColor && (
+        {settings.cinemaMode && (
           <div className={styles.cinemaBg}>
-            <div className={`${styles.cinemaOrb} ${styles.cinemaOrb1}`} style={{ backgroundColor: coverColor }} />
-            <div className={`${styles.cinemaOrb} ${styles.cinemaOrb2}`} style={{ backgroundColor: coverColor }} />
-            <div className={`${styles.cinemaOrb} ${styles.cinemaOrb3}`} style={{ backgroundColor: coverColor }} />
+            {/* Blurred cover art as background layer */}
+            {track?.cover_art_url && (
+              <img
+                className={styles.cinemaCoverBg}
+                src={track.cover_art_url}
+                alt=""
+                onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              />
+            )}
+            {/* Floating orbs with CSS-only pulse — togglable for performance */}
+            {settings.cinemaOrbs && coverColor && (
+              <>
+                <div
+                  className={`${styles.cinemaOrb} ${styles.cinemaOrb1}`}
+                  style={{ backgroundColor: coverColor }}
+                />
+                <div
+                  className={`${styles.cinemaOrb} ${styles.cinemaOrb2}`}
+                  style={{ backgroundColor: coverColor }}
+                />
+                <div
+                  className={`${styles.cinemaOrb} ${styles.cinemaOrb3}`}
+                  style={{ backgroundColor: coverColor }}
+                />
+              </>
+            )}
+            {/* Floating particles — togglable for performance */}
+            {settings.cinemaOrbs && (
+              <CinemaParticles color={coverColor || 'rgba(255,255,255,0.3)'} />
+            )}
             <div className={styles.cinemaVignette} />
           </div>
         )}
