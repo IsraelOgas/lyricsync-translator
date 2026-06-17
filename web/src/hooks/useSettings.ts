@@ -24,6 +24,7 @@ function loadFromStorage(): Settings {
       romanizationColor: typeof parsed.romanizationColor === 'string' ? parsed.romanizationColor : DEFAULT_SETTINGS.romanizationColor,
       targetLang: typeof parsed.targetLang === 'string' ? parsed.targetLang : DEFAULT_SETTINGS.targetLang,
       cinemaMode: typeof parsed.cinemaMode === 'boolean' ? parsed.cinemaMode : DEFAULT_SETTINGS.cinemaMode,
+      cinemaOrbs: typeof parsed.cinemaOrbs === 'boolean' ? parsed.cinemaOrbs : DEFAULT_SETTINGS.cinemaOrbs,
     };
   } catch {
     return DEFAULT_SETTINGS;

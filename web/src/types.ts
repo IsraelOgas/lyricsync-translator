@@ -61,6 +61,7 @@ export interface Settings {
   romanizationColor: string;
   targetLang: string;
   cinemaMode: boolean;
+  cinemaOrbs: boolean;
 }
 
 /** Subset of stored song for list endpoints — no lyric data. */
@@ -83,6 +84,7 @@ export const DEFAULT_SETTINGS: Settings = {
   romanizationColor: '#a0a0ee',
   targetLang: 'es',
   cinemaMode: false,
+  cinemaOrbs: true,
 };
 
 // Global declarations for the Wails desktop environment.

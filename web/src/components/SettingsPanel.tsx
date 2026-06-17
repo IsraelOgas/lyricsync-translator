@@ -258,6 +258,17 @@ export const SettingsPanel: React.FC<Props> = ({ isOpen, settings, onUpdateSetti
             />
           </div>
 
+          {/* Cinema Orbs */}
+          <div className={styles.toggleRow}>
+            <label className={styles.label}>Cinema Orbs</label>
+            <input
+              type="checkbox"
+              className={styles.checkbox}
+              checked={settings.cinemaOrbs}
+              onChange={e => onUpdateSetting('cinemaOrbs', e.target.checked)}
+            />
+          </div>
+
         </div>
       </div>
     </>
