@@ -1,12 +1,16 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume1, Volume2, VolumeX, Settings, HelpCircle } from 'lucide-react';
-import type { TrackInfo } from '../types';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume1, Volume2, VolumeX, Settings, HelpCircle, Radio } from 'lucide-react';
+import type { TrackInfo, PlayerInfo } from '../types';
 import styles from './PlayerBar.module.css';
 
 interface Props {
   track: TrackInfo | null;
   status: string;
   positionMs: number;
+  activePlayer: string;
+  players: PlayerInfo[];
+  onSetPlayer: (playerName: string) => void;
+  onFetchPlayers: () => void;
   onOpenSettings: () => void;
   onOpenHelp: () => void;
 }
@@ -29,7 +33,7 @@ function post(url: string, body?: unknown): void {
 
 const iconSize = 20;
 
-export const PlayerBar: React.FC<Props> = ({ track, status, positionMs, onOpenSettings, onOpenHelp }) => {
+export const PlayerBar: React.FC<Props> = ({ track, status, positionMs, activePlayer, players, onSetPlayer, onFetchPlayers, onOpenSettings, onOpenHelp }) => {
   const durationMs = track?.duration_ms ?? 0;
   const hasDuration = durationMs > 0;
   const progress = hasDuration ? Math.min(1, Math.max(0, positionMs / durationMs)) : 0;
@@ -40,6 +44,7 @@ export const PlayerBar: React.FC<Props> = ({ track, status, positionMs, onOpenSe
   const [muted, setMuted] = useState(false);
   const prevVol = useRef(0.5);
   const stateFetched = useRef(false);
+  const playersFetched = useRef(false);
 
   // Fetch initial player state from backend
   useEffect(() => {
@@ -65,6 +70,43 @@ export const PlayerBar: React.FC<Props> = ({ track, status, positionMs, onOpenSe
       .then(data => setLoopState((data.loop ?? 'None').toLowerCase()))
       .catch(() => {});
   }, []);
+
+  // Re-fetch player state when active player changes
+  const prevActivePlayer = useRef(activePlayer);
+  useEffect(() => {
+    if (prevActivePlayer.current === activePlayer) return;
+    prevActivePlayer.current = activePlayer;
+
+    fetch('/api/player/volume')
+      .then(r => r.json())
+      .then(data => {
+        const v = data.volume ?? 0.5;
+        setVol(v);
+        prevVol.current = v;
+        setMuted(false);
+      })
+      .catch(() => {});
+
+    fetch('/api/player/shuffle')
+      .then(r => r.json())
+      .then(data => setShuffleOn(!!data.shuffle))
+      .catch(() => {});
+
+    fetch('/api/player/loop')
+      .then(r => r.json())
+      .then(data => setLoopState((data.loop ?? 'None').toLowerCase()))
+      .catch(() => {});
+  }, [activePlayer]);
+
+  // Fetch players list on mount and periodically
+  useEffect(() => {
+    if (!playersFetched.current) {
+      playersFetched.current = true;
+      onFetchPlayers();
+    }
+    const interval = setInterval(onFetchPlayers, 3000);
+    return () => clearInterval(interval);
+  }, [onFetchPlayers]);
 
   const handleProgressClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (!hasDuration) return;
@@ -130,6 +172,26 @@ export const PlayerBar: React.FC<Props> = ({ track, status, positionMs, onOpenSe
         </div>
         <span className={styles.time}>{hasDuration ? formatTime(durationMs) : '--:--'}</span>
       </div>
+
+      {/* Player selector */}
+      {players.length > 1 && (
+        <div className={styles.playerSelector}>
+          <Radio size={14} className={styles.playerIcon} />
+          <select
+            className={styles.playerSelect}
+            value={activePlayer}
+            onChange={e => onSetPlayer(e.target.value)}
+            title="Select active player"
+            aria-label="Select active player"
+          >
+            {players.map(p => (
+              <option key={p.name} value={p.name}>
+                {p.name} ({p.status})
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* Controls */}
       <div className={styles.controls}>

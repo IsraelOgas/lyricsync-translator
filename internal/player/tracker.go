@@ -8,11 +8,14 @@ import (
 
 // Tracker combines MPRIS channels into a coherent state and emits events.
 type Tracker struct {
-	currentTrack  *TrackInfo
-	status        PlayerStatus
-	positionMs    int64
-	activePlayer  string
-	playerctl     string
+	currentTrack    *TrackInfo
+	status          PlayerStatus
+	positionMs      int64
+	activePlayer    string
+	manualPlayer    string // user-selected player override (empty = auto)
+	playerctl       string
+	availableCached []string
+	cacheExpiry     time.Time
 }
 
 // TrackerEvent is a JSON-serializable update sent to SSE clients.
@@ -21,6 +24,7 @@ type TrackerEvent struct {
 	Track      *TrackInfo `json:"track,omitempty"`
 	Status     string     `json:"status,omitempty"`
 	PositionMs int64      `json:"position_ms,omitempty"`
+	PlayerName string     `json:"player_name,omitempty"`
 	Timestamp  int64      `json:"timestamp"`
 }
 
@@ -54,20 +58,26 @@ func (t *Tracker) Events(ctx context.Context) <-chan []byte {
 
 		// Check if a track is already playing on startup
 		if playerName, initialTrack, initialStatus := GetCurrentTrack(t.playerctl); initialTrack != nil {
-			t.activePlayer = playerName
+			if t.manualPlayer == "" {
+				t.activePlayer = playerName
+			} else {
+				t.activePlayer = t.manualPlayer
+			}
 			t.currentTrack = initialTrack
 			t.status = initialStatus
 			msg, _ := json.Marshal(TrackerEvent{
-				Type:      "track",
-				Track:     initialTrack,
-				Timestamp: time.Now().UnixMilli(),
+				Type:       "track",
+				Track:      initialTrack,
+				PlayerName: t.activePlayer,
+				Timestamp:  time.Now().UnixMilli(),
 			})
 			out <- msg
 			// Also emit the initial status so the frontend shows it
 			statusMsg, _ := json.Marshal(TrackerEvent{
-				Type:      "status",
-				Status:    initialStatus.String(),
-				Timestamp: time.Now().UnixMilli(),
+				Type:       "status",
+				Status:     initialStatus.String(),
+				PlayerName: t.activePlayer,
+				Timestamp:  time.Now().UnixMilli(),
 			})
 			out <- statusMsg
 		}
@@ -81,36 +91,42 @@ func (t *Tracker) Events(ctx context.Context) <-chan []byte {
 			case <-ctx.Done():
 				return
 
-			case track, ok := <-trackCh:
-				if !ok {
-					return
-				}
-				changed := t.currentTrack == nil ||
-					t.currentTrack.Artist != track.Artist ||
-					t.currentTrack.Title != track.Title
-				t.currentTrack = &track
-				if changed {
-					msg, _ := json.Marshal(TrackerEvent{
-						Type:      "track",
-						Track:     &track,
-						Timestamp: time.Now().UnixMilli(),
-					})
-					out <- msg
-				}
+		case track, ok := <-trackCh:
+			if !ok {
+				return
+			}
+			changed := t.currentTrack == nil ||
+				t.currentTrack.Artist != track.Artist ||
+				t.currentTrack.Title != track.Title
+			t.currentTrack = &track
+			// Update active player from track event when in auto mode
+			if t.manualPlayer == "" && track.PlayerName != "" {
+				t.activePlayer = track.PlayerName
+			}
+			if changed {
+				msg, _ := json.Marshal(TrackerEvent{
+					Type:       "track",
+					Track:      &track,
+					PlayerName: t.activePlayer,
+					Timestamp:  time.Now().UnixMilli(),
+				})
+				out <- msg
+			}
 
-			case status, ok := <-statusCh:
-				if !ok {
-					return
-				}
-				if t.status != status {
-					t.status = status
-					msg, _ := json.Marshal(TrackerEvent{
-						Type:      "status",
-						Status:    status.String(),
-						Timestamp: time.Now().UnixMilli(),
-					})
-					out <- msg
-				}
+		case status, ok := <-statusCh:
+			if !ok {
+				return
+			}
+			if t.status != status {
+				t.status = status
+				msg, _ := json.Marshal(TrackerEvent{
+					Type:       "status",
+					Status:     status.String(),
+					PlayerName: t.activePlayer,
+					Timestamp:  time.Now().UnixMilli(),
+				})
+				out <- msg
+			}
 
 			case pos, ok := <-posCh:
 				if !ok {
@@ -152,4 +168,50 @@ func (t *Tracker) GetPositionMs() int64 {
 // GetActivePlayer returns the name of the currently tracked MPRIS player.
 func (t *Tracker) GetActivePlayer() string {
 	return t.activePlayer
+}
+
+// SetManualPlayer overrides the auto-detected active player with the given name.
+// Subsequent auto-switching is disabled until ClearManualPlayer is called.
+func (t *Tracker) SetManualPlayer(name string) {
+	t.manualPlayer = name
+	t.activePlayer = name
+}
+
+// ClearManualPlayer re-enables automatic player switching.
+func (t *Tracker) ClearManualPlayer() {
+	t.manualPlayer = ""
+}
+
+// IsManual returns true if the active player was set manually by the user.
+func (t *Tracker) IsManual() bool {
+	return t.manualPlayer != ""
+}
+
+// ListAvailablePlayers returns all MPRIS players with their current status.
+func (t *Tracker) ListAvailablePlayers() ([]PlayerInfo, error) {
+	players, err := ListPlayers(t.playerctl)
+	if err != nil {
+		return nil, err
+	}
+
+	var result []PlayerInfo
+	for _, name := range players {
+		track, status := GetPlayerTrack(t.playerctl, name)
+		pi := PlayerInfo{
+			Name:   name,
+			Status: status.String(),
+		}
+		if track != nil {
+			pi.Track = track
+		}
+		result = append(result, pi)
+	}
+	return result, nil
+}
+
+// PlayerInfo holds a player name and its current state.
+type PlayerInfo struct {
+	Name   string     `json:"name"`
+	Status string     `json:"status"`
+	Track  *TrackInfo `json:"track,omitempty"`
 }

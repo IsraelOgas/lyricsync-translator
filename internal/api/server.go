@@ -136,6 +136,11 @@ func NewServer(
 	r.Post("/api/player/loop", s.handleLoop)
 	r.Get("/api/player/loop", s.handleGetLoop)
 
+	// Player selection
+	r.Get("/api/players", s.handleListPlayers)
+	r.Get("/api/players/active", s.handleGetActivePlayer)
+	r.Post("/api/players/active", s.handleSetActivePlayer)
+
 	return s
 }
 

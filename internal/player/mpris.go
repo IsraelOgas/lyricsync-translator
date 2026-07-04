@@ -15,6 +15,7 @@ type TrackInfo struct {
 	Album       string `json:"album,omitempty"`
 	CoverArtURL string `json:"cover_art_url,omitempty"`
 	DurationMs  int    `json:"duration_ms"`
+	PlayerName  string `json:"player_name,omitempty"`
 }
 
 // PlayerStatus represents the player state.
@@ -164,6 +165,7 @@ func Start(playerctlPath string, activePlayer *string) (<-chan TrackInfo, <-chan
 					Album:       album,
 					CoverArtURL: artUrl,
 					DurationMs:  durationMs,
+					PlayerName:  playerName,
 				}
 			}
 
@@ -408,6 +410,7 @@ func GetCurrentTrack(playerctlPath string) (string, *TrackInfo, PlayerStatus) {
 				Album:       album,
 				CoverArtURL: artUrl,
 				DurationMs:  durationMs,
+				PlayerName:  playerName,
 			},
 			status: status,
 		}
@@ -442,7 +445,7 @@ func GetCurrentTrack(playerctlPath string) (string, *TrackInfo, PlayerStatus) {
 	// Fallback: try each player individually
 	players, _ := ListPlayers(playerctlPath)
 	for _, playerName := range players {
-		track, status := getPlayerTrack(playerctlPath, playerName)
+		track, status := GetPlayerTrack(playerctlPath, playerName)
 		if track != nil {
 			return playerName, track, status
 		}
@@ -450,7 +453,8 @@ func GetCurrentTrack(playerctlPath string) (string, *TrackInfo, PlayerStatus) {
 	return "", nil, StatusNoPlayer
 }
 
-func getPlayerTrack(playerctlPath, playerName string) (*TrackInfo, PlayerStatus) {
+// GetPlayerTrack queries a specific player for its current track (one-shot).
+func GetPlayerTrack(playerctlPath, playerName string) (*TrackInfo, PlayerStatus) {
 	format := "{{artist}}||{{title}}||{{album}}||{{mpris:length}}||{{status}}||{{playerName}}||{{mpris:artUrl}}"
 	cmd := exec.Command(playerctlPath, "-p", playerName, "--format", format, "metadata", "status")
 	out, err := cmd.Output()
@@ -504,6 +508,7 @@ func getPlayerTrack(playerctlPath, playerName string) (*TrackInfo, PlayerStatus)
 			Album:       album,
 			CoverArtURL: artUrl,
 			DurationMs:  durationMs,
+			PlayerName:  playerName,
 		}, status
 	}
 	return nil, StatusNoPlayer

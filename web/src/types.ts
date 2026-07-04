@@ -4,6 +4,7 @@ export interface TrackInfo {
   album?: string;
   cover_art_url?: string;
   duration_ms: number;
+  player_name?: string;
 }
 
 export interface TrackerEvent {
@@ -11,7 +12,14 @@ export interface TrackerEvent {
   track?: TrackInfo;
   status?: string;
   position_ms?: number;
+  player_name?: string;
   timestamp: number;
+}
+
+export interface PlayerInfo {
+  name: string;
+  status: string;
+  track?: TrackInfo;
 }
 
 export interface LyricLineData {

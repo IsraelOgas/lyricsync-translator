@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useSSE } from './useSSE';
 import { apiUrl } from '../api';
-import type { TrackInfo, LyricLineData } from '../types';
+import type { TrackInfo, LyricLineData, PlayerInfo } from '../types';
 
 export interface UsePlayerStateReturn {
   track: TrackInfo | null;
@@ -14,9 +14,13 @@ export interface UsePlayerStateReturn {
   paused: boolean;
   lyricsError: string | null;
   offsetMs: number;
+  activePlayer: string;
+  players: PlayerInfo[];
   handleTogglePlayPause: () => void;
   handleRetryLyrics: () => void;
   handleUpdateOffset: (offsetMs: number) => void;
+  handleSetPlayer: (playerName: string) => void;
+  fetchPlayers: () => void;
 }
 
 export function usePlayerState(): UsePlayerStateReturn {
@@ -30,6 +34,8 @@ export function usePlayerState(): UsePlayerStateReturn {
   const [lyricsError, setLyricsError] = useState<string | null>(null);
   const [offsetMs, setOffsetMs] = useState(0);
   const [songHash, setSongHash] = useState<string | null>(null);
+  const [activePlayer, setActivePlayer] = useState<string>('');
+  const [players, setPlayers] = useState<PlayerInfo[]>([]);
 
   // Derive paused from player status reported via SSE
   const paused = status !== 'playing';
@@ -44,7 +50,38 @@ export function usePlayerState(): UsePlayerStateReturn {
     fetch(apiUrl('/api/lyrics/retry'), { method: 'POST' }).catch(() => {});
   }, []);
 
+  const handleSetPlayer = useCallback((playerName: string) => {
+    fetch(apiUrl('/api/players/active'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ player: playerName }),
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.active_player !== undefined) {
+          setActivePlayer(data.active_player);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const fetchPlayers = useCallback(() => {
+    fetch(apiUrl('/api/players'))
+      .then(r => r.json())
+      .then(data => {
+        if (data.players) {
+          setPlayers(data.players);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   const handleEvent = useCallback((event: any) => {
+    // Track active player from any event that includes it
+    if (event.player_name !== undefined) {
+      setActivePlayer(event.player_name);
+    }
+
     switch (event.type) {
       case 'track':
         if (event.track) {
@@ -106,5 +143,5 @@ export function usePlayerState(): UsePlayerStateReturn {
     }
   }, [songHash]);
 
-  return { track, status, positionMs, lines, notFound, fetchingLyrics, translating, paused, lyricsError, offsetMs, handleTogglePlayPause, handleRetryLyrics, handleUpdateOffset };
+  return { track, status, positionMs, lines, notFound, fetchingLyrics, translating, paused, lyricsError, offsetMs, activePlayer, players, handleTogglePlayPause, handleRetryLyrics, handleUpdateOffset, handleSetPlayer, fetchPlayers };
 }

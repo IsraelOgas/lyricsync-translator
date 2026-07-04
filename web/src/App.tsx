@@ -18,7 +18,7 @@ import type { Settings } from './types';
 import styles from './App.module.css';
 
 const App: React.FC = () => {
-  const { track, status, positionMs, lines, notFound, fetchingLyrics, translating, paused, lyricsError, offsetMs, handleTogglePlayPause, handleRetryLyrics, handleUpdateOffset } = usePlayerState();
+  const { track, status, positionMs, lines, notFound, fetchingLyrics, translating, paused, lyricsError, offsetMs, activePlayer, players, handleTogglePlayPause, handleRetryLyrics, handleUpdateOffset, handleSetPlayer, fetchPlayers } = usePlayerState();
   const { settings, updateSetting } = useSettings();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -189,6 +189,10 @@ const App: React.FC = () => {
               track={track}
               status={status}
               positionMs={positionMs}
+              activePlayer={activePlayer}
+              players={players}
+              onSetPlayer={handleSetPlayer}
+              onFetchPlayers={fetchPlayers}
               onOpenSettings={() => setSettingsOpen(true)}
               onOpenHelp={() => setHelpOpen(true)}
             />}

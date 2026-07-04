@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
 	"github.com/imov/lyricsync-translator/internal/config"
+	"github.com/imov/lyricsync-translator/internal/player"
 	"github.com/imov/lyricsync-translator/internal/translate"
 )
 
@@ -204,4 +206,71 @@ func (s *Server) handleUpdateProvider(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte(`{"ok":true}`))
+}
+
+// handleListPlayers returns all available MPRIS players with their status.
+func (s *Server) handleListPlayers(w http.ResponseWriter, r *http.Request) {
+	players, err := s.tracker.ListAvailablePlayers()
+	if err != nil {
+		http.Error(w, `{"error":"failed to list players"}`, http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"players": players,
+	})
+}
+
+// handleGetActivePlayer returns the currently active player.
+func (s *Server) handleGetActivePlayer(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"active_player": s.tracker.GetActivePlayer(),
+		"is_manual":     s.tracker.IsManual(),
+	})
+}
+
+// handleSetActivePlayer switches the active player.
+// Body: { "player": "spotify" } or { "player": "" } to clear manual override.
+func (s *Server) handleSetActivePlayer(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Player string `json:"player"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, `{"error":"invalid json"}`, http.StatusBadRequest)
+		return
+	}
+
+	if body.Player == "" {
+		s.tracker.ClearManualPlayer()
+	} else {
+		s.tracker.SetManualPlayer(body.Player)
+	}
+
+	// Immediately emit track + status of the newly selected player
+	target := s.tracker.GetActivePlayer()
+	if target != "" {
+		if track, status := player.GetPlayerTrack(s.cfg.Player.PlayerctlPath, target); track != nil {
+			trackMsg, _ := json.Marshal(player.TrackerEvent{
+				Type:       "track",
+				Track:      track,
+				PlayerName: target,
+				Timestamp:  time.Now().UnixMilli(),
+			})
+			s.sse.Publish(trackMsg)
+			statusMsg, _ := json.Marshal(player.TrackerEvent{
+				Type:       "status",
+				Status:     status.String(),
+				PlayerName: target,
+				Timestamp:  time.Now().UnixMilli(),
+			})
+			s.sse.Publish(statusMsg)
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"active_player": s.tracker.GetActivePlayer(),
+		"is_manual":     s.tracker.IsManual(),
+	})
 }
