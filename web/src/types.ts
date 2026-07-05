@@ -62,6 +62,7 @@ export interface Settings {
   targetLang: string;
   cinemaMode: boolean;
   textAlignment: 'left' | 'center' | 'right';
+  karaokeMode: boolean;
 }
 
 /** Subset of stored song for list endpoints — no lyric data. */
@@ -85,6 +86,7 @@ export const DEFAULT_SETTINGS: Settings = {
   targetLang: 'es',
   cinemaMode: false,
   textAlignment: 'center',
+  karaokeMode: true,
 };
 
 // Global declarations for the Wails desktop environment.

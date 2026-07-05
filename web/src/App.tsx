@@ -146,6 +146,7 @@ const App: React.FC = () => {
               lyricsError={lyricsError}
               onRetry={handleRetryLyrics}
               showRomanization={settings.showRomanization}
+              karaokeMode={settings.karaokeMode}
             />
             {!settings.cinemaMode && <PlayerBar
               track={track}

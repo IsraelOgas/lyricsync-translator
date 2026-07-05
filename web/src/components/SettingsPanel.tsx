@@ -280,6 +280,17 @@ export const SettingsPanel: React.FC<Props> = ({ isOpen, settings, onUpdateSetti
             />
           </div>
 
+          {/* Karaoke Fill */}
+          <div className={styles.toggleRow}>
+            <label className={styles.label}>Karaoke Fill</label>
+            <input
+              type="checkbox"
+              className={styles.checkbox}
+              checked={settings.karaokeMode}
+              onChange={e => onUpdateSetting('karaokeMode', e.target.checked)}
+            />
+          </div>
+
         </div>
       </div>
     </>

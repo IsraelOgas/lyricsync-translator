@@ -22,6 +22,13 @@ const SHIMMER_MARGINS: Record<Settings['textAlignment'], { left: string; right: 
   right: { left: 'auto', right: '0' },
 };
 
+/** Cinema track info position: opposite side of lyrics for visual balance. */
+const CINEMA_POSITION: Record<Settings['textAlignment'], { left: string; right: string }> = {
+  left: { left: 'auto', right: '20px' },    // lyrics on left → info on right
+  center: { left: '20px', right: 'auto' },  // lyrics centered → info on left (default)
+  right: { left: '20px', right: 'auto' },   // lyrics on right → info on left
+};
+
 function loadFromStorage(): Settings {
   try {
     const raw = localStorage.getItem('lyricsync-settings');
@@ -38,6 +45,7 @@ function loadFromStorage(): Settings {
       targetLang: typeof parsed.targetLang === 'string' ? parsed.targetLang : DEFAULT_SETTINGS.targetLang,
       cinemaMode: typeof parsed.cinemaMode === 'boolean' ? parsed.cinemaMode : DEFAULT_SETTINGS.cinemaMode,
       textAlignment: ['left', 'center', 'right'].includes(parsed.textAlignment) ? parsed.textAlignment : DEFAULT_SETTINGS.textAlignment,
+      karaokeMode: typeof parsed.karaokeMode === 'boolean' ? parsed.karaokeMode : DEFAULT_SETTINGS.karaokeMode,
     };
   } catch {
     return DEFAULT_SETTINGS;
@@ -63,7 +71,10 @@ function applySettings(settings: Settings): void {
   root.style.setProperty('--transform-origin-lyrics', ALIGNMENT_ORIGIN[settings.textAlignment]);
   root.style.setProperty('--shimmer-margin-left', SHIMMER_MARGINS[settings.textAlignment].left);
   root.style.setProperty('--shimmer-margin-right', SHIMMER_MARGINS[settings.textAlignment].right);
+  root.style.setProperty('--cinema-track-left', CINEMA_POSITION[settings.textAlignment].left);
+  root.style.setProperty('--cinema-track-right', CINEMA_POSITION[settings.textAlignment].right);
   root.setAttribute('data-theme', settings.theme);
+  root.setAttribute('data-karaoke', settings.karaokeMode ? 'true' : 'false');
 
   // Native fullscreen via Wails runtime (guarded — only active inside Wails WebView).
   if (settings.cinemaMode) {

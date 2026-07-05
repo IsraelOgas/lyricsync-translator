@@ -149,7 +149,7 @@
 }
 
 /* Karaoke gradient sweep — active line text fills with color from left to right */
-.lineActive .original {
+:root[data-karaoke="true"] .lineActive .original {
   background: linear-gradient(
     90deg,
     var(--color-primary) calc(var(--karaoke-progress, 0) * 100%),
@@ -160,8 +160,13 @@
   -webkit-text-fill-color: transparent;
 }
 
+:root[data-karaoke="false"] .lineActive .original {
+  background: none;
+  -webkit-text-fill-color: var(--color-text-bright);
+}
+
 /* Romanization mode: sweep the romanized text instead */
-[data-has-romanization="true"] .lineActive .romanized {
+:root[data-karaoke="true"] [data-has-romanization="true"] .lineActive .romanized {
   background: linear-gradient(
     90deg,
     var(--color-primary) calc(var(--karaoke-progress, 0) * 100%),
@@ -170,6 +175,11 @@
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
+}
+
+:root[data-karaoke="false"] [data-has-romanization="true"] .lineActive .romanized {
+  background: none;
+  -webkit-text-fill-color: var(--color-romanization);
 }
 
 .lineInactive {
