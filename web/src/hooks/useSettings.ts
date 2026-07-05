@@ -9,6 +9,19 @@ const FONT_FAMILIES: Record<Settings['fontFamily'], string> = {
   rounded: "'Nunito', 'Quicksand', 'Segoe UI', sans-serif",
 };
 
+const ALIGNMENT_ORIGIN: Record<Settings['textAlignment'], string> = {
+  left: 'left center',
+  center: 'center center',
+  right: 'right center',
+};
+
+/** Margins for block elements (skeletons, shimmers) to follow text alignment. */
+const SHIMMER_MARGINS: Record<Settings['textAlignment'], { left: string; right: string }> = {
+  left: { left: '0', right: 'auto' },
+  center: { left: 'auto', right: 'auto' },
+  right: { left: 'auto', right: '0' },
+};
+
 function loadFromStorage(): Settings {
   try {
     const raw = localStorage.getItem('lyricsync-settings');
@@ -24,6 +37,7 @@ function loadFromStorage(): Settings {
       romanizationColor: typeof parsed.romanizationColor === 'string' ? parsed.romanizationColor : DEFAULT_SETTINGS.romanizationColor,
       targetLang: typeof parsed.targetLang === 'string' ? parsed.targetLang : DEFAULT_SETTINGS.targetLang,
       cinemaMode: typeof parsed.cinemaMode === 'boolean' ? parsed.cinemaMode : DEFAULT_SETTINGS.cinemaMode,
+      textAlignment: ['left', 'center', 'right'].includes(parsed.textAlignment) ? parsed.textAlignment : DEFAULT_SETTINGS.textAlignment,
     };
   } catch {
     return DEFAULT_SETTINGS;
@@ -45,6 +59,10 @@ function applySettings(settings: Settings): void {
   root.style.setProperty('--line-spacing-lyrics', String(settings.lineSpacing));
   root.style.setProperty('--color-romanization', settings.romanizationColor);
   root.style.setProperty('--color-translation', settings.translationColor);
+  root.style.setProperty('--text-align-lyrics', settings.textAlignment);
+  root.style.setProperty('--transform-origin-lyrics', ALIGNMENT_ORIGIN[settings.textAlignment]);
+  root.style.setProperty('--shimmer-margin-left', SHIMMER_MARGINS[settings.textAlignment].left);
+  root.style.setProperty('--shimmer-margin-right', SHIMMER_MARGINS[settings.textAlignment].right);
   root.setAttribute('data-theme', settings.theme);
 
   // Native fullscreen via Wails runtime (guarded — only active inside Wails WebView).

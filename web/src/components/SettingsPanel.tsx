@@ -28,6 +28,12 @@ const FONTS: { value: Settings['fontFamily']; label: string }[] = [
   { value: 'rounded', label: 'Rounded' },
 ];
 
+const ALIGNMENTS: { value: Settings['textAlignment']; label: string }[] = [
+  { value: 'left', label: 'Left' },
+  { value: 'center', label: 'Center' },
+  { value: 'right', label: 'Right' },
+];
+
 const LANGUAGES: { value: string; label: string }[] = [
   { value: 'es', label: 'Español' },
   { value: 'en', label: 'English' },
@@ -104,6 +110,22 @@ export const SettingsPanel: React.FC<Props> = ({ isOpen, settings, onUpdateSetti
                   onClick={() => onUpdateSetting('fontFamily', f.value)}
                 >
                   {f.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Text Alignment */}
+          <div className={styles.field}>
+            <label className={styles.label}>Text Alignment</label>
+            <div className={styles.chipRow}>
+              {ALIGNMENTS.map(a => (
+                <button
+                  key={a.value}
+                  className={`${styles.chip} ${settings.textAlignment === a.value ? styles.chipActive : ''}`}
+                  onClick={() => onUpdateSetting('textAlignment', a.value)}
+                >
+                  {a.label}
                 </button>
               ))}
             </div>
