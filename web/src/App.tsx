@@ -95,9 +95,6 @@ const App: React.FC = () => {
         {/* Animated karaoke background — only in cinema mode */}
         {settings.cinemaMode && coverColor && (
           <div className={styles.cinemaBg}>
-            <div className={`${styles.cinemaOrb} ${styles.cinemaOrb1}`} style={{ backgroundColor: coverColor }} />
-            <div className={`${styles.cinemaOrb} ${styles.cinemaOrb2}`} style={{ backgroundColor: coverColor }} />
-            <div className={`${styles.cinemaOrb} ${styles.cinemaOrb3}`} style={{ backgroundColor: coverColor }} />
             <div className={styles.cinemaVignette} />
           </div>
         )}
@@ -146,6 +143,7 @@ const App: React.FC = () => {
               lyricsError={lyricsError}
               onRetry={handleRetryLyrics}
               showRomanization={settings.showRomanization}
+              karaokeMode={settings.karaokeMode}
             />
             {!settings.cinemaMode && <PlayerBar
               track={track}

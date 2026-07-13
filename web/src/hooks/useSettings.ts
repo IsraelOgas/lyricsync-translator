@@ -9,6 +9,26 @@ const FONT_FAMILIES: Record<Settings['fontFamily'], string> = {
   rounded: "'Nunito', 'Quicksand', 'Segoe UI', sans-serif",
 };
 
+const ALIGNMENT_ORIGIN: Record<Settings['textAlignment'], string> = {
+  left: 'left center',
+  center: 'center center',
+  right: 'right center',
+};
+
+/** Margins for block elements (skeletons, shimmers) to follow text alignment. */
+const SHIMMER_MARGINS: Record<Settings['textAlignment'], { left: string; right: string }> = {
+  left: { left: '0', right: 'auto' },
+  center: { left: 'auto', right: 'auto' },
+  right: { left: 'auto', right: '0' },
+};
+
+/** Cinema track info position: opposite side of lyrics for visual balance. */
+const CINEMA_POSITION: Record<Settings['textAlignment'], { left: string; right: string }> = {
+  left: { left: 'auto', right: '20px' },    // lyrics on left → info on right
+  center: { left: '20px', right: 'auto' },  // lyrics centered → info on left (default)
+  right: { left: '20px', right: 'auto' },   // lyrics on right → info on left
+};
+
 function loadFromStorage(): Settings {
   try {
     const raw = localStorage.getItem('lyricsync-settings');
@@ -24,6 +44,8 @@ function loadFromStorage(): Settings {
       romanizationColor: typeof parsed.romanizationColor === 'string' ? parsed.romanizationColor : DEFAULT_SETTINGS.romanizationColor,
       targetLang: typeof parsed.targetLang === 'string' ? parsed.targetLang : DEFAULT_SETTINGS.targetLang,
       cinemaMode: typeof parsed.cinemaMode === 'boolean' ? parsed.cinemaMode : DEFAULT_SETTINGS.cinemaMode,
+      textAlignment: ['left', 'center', 'right'].includes(parsed.textAlignment) ? parsed.textAlignment : DEFAULT_SETTINGS.textAlignment,
+      karaokeMode: typeof parsed.karaokeMode === 'boolean' ? parsed.karaokeMode : DEFAULT_SETTINGS.karaokeMode,
     };
   } catch {
     return DEFAULT_SETTINGS;
@@ -45,7 +67,14 @@ function applySettings(settings: Settings): void {
   root.style.setProperty('--line-spacing-lyrics', String(settings.lineSpacing));
   root.style.setProperty('--color-romanization', settings.romanizationColor);
   root.style.setProperty('--color-translation', settings.translationColor);
+  root.style.setProperty('--text-align-lyrics', settings.textAlignment);
+  root.style.setProperty('--transform-origin-lyrics', ALIGNMENT_ORIGIN[settings.textAlignment]);
+  root.style.setProperty('--shimmer-margin-left', SHIMMER_MARGINS[settings.textAlignment].left);
+  root.style.setProperty('--shimmer-margin-right', SHIMMER_MARGINS[settings.textAlignment].right);
+  root.style.setProperty('--cinema-track-left', CINEMA_POSITION[settings.textAlignment].left);
+  root.style.setProperty('--cinema-track-right', CINEMA_POSITION[settings.textAlignment].right);
   root.setAttribute('data-theme', settings.theme);
+  root.setAttribute('data-karaoke', settings.karaokeMode ? 'true' : 'false');
 
   // Native fullscreen via Wails runtime (guarded — only active inside Wails WebView).
   if (settings.cinemaMode) {

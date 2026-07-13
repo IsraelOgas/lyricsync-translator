@@ -128,10 +128,11 @@
 }
 
 .line {
-  text-align: center;
+  text-align: var(--text-align-lyrics, center);
   padding: 12px 20px;
   transition: all 0.3s ease;
   line-height: var(--line-spacing-lyrics);
+  transform-origin: var(--transform-origin-lyrics, center center);
 }
 
 .clickable {
@@ -148,7 +149,7 @@
 }
 
 /* Karaoke gradient sweep — active line text fills with color from left to right */
-.lineActive .original {
+:root[data-karaoke="true"] .lineActive .original {
   background: linear-gradient(
     90deg,
     var(--color-primary) calc(var(--karaoke-progress, 0) * 100%),
@@ -159,8 +160,13 @@
   -webkit-text-fill-color: transparent;
 }
 
+:root[data-karaoke="false"] .lineActive .original {
+  background: none;
+  -webkit-text-fill-color: var(--color-text-bright);
+}
+
 /* Romanization mode: sweep the romanized text instead */
-[data-has-romanization="true"] .lineActive .romanized {
+:root[data-karaoke="true"] [data-has-romanization="true"] .lineActive .romanized {
   background: linear-gradient(
     90deg,
     var(--color-primary) calc(var(--karaoke-progress, 0) * 100%),
@@ -171,10 +177,15 @@
   -webkit-text-fill-color: transparent;
 }
 
+:root[data-karaoke="false"] [data-has-romanization="true"] .lineActive .romanized {
+  background: none;
+  -webkit-text-fill-color: var(--color-romanization);
+}
+
 .lineInactive {
   opacity: 0.48;
   transform: scale(0.76);
-  transform-origin: center center;
+  transform-origin: var(--transform-origin-lyrics, center center);
 }
 
 .original {
@@ -227,7 +238,10 @@
   width: 55%;
   max-width: 200px;
   height: 6px;
-  margin: 6px auto 0;
+  margin-top: 6px;
+  margin-bottom: 0;
+  margin-left: var(--shimmer-margin-left, auto);
+  margin-right: var(--shimmer-margin-right, auto);
   border-radius: 3px;
   background: linear-gradient(
     90deg,
@@ -277,6 +291,8 @@
   max-width: 400px;
   height: 22px;
   margin-bottom: 24px;
+  margin-left: var(--shimmer-margin-left, auto);
+  margin-right: var(--shimmer-margin-right, auto);
   border-radius: 4px;
   background: var(--color-muted);
   animation: lyricsync-pulse 1.5s ease-in-out infinite;
