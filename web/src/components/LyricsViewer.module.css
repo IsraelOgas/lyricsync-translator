@@ -37,6 +37,7 @@
   letter-spacing: 2px;
 }
 
+
 .errorBanner {
   display: flex;
   align-items: center;
@@ -148,8 +149,31 @@
   /* opacity: 1 is the browser default — no override needed */
 }
 
+/* ── Word-level karaoke (lrcmux native) ── */
+
+.wordDone {
+  color: var(--color-primary);
+}
+
+.wordActive {
+  background: linear-gradient(
+    90deg,
+    var(--color-primary) calc(var(--word-progress, 0) * 100%),
+    var(--color-text-bright) calc(var(--word-progress, 0) * 100%)
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.wordPending {
+  color: var(--color-text-bright);
+}
+
+/* ── Line-level karaoke (fallback for LRCLIB / providers without word data) ── */
+
 /* Karaoke gradient sweep — active line text fills with color from left to right */
-:root[data-karaoke="true"] .lineActive .original {
+:root[data-karaoke="true"] .lineActive .original:not(:has(.wordDone, .wordActive, .wordPending)) {
   background: linear-gradient(
     90deg,
     var(--color-primary) calc(var(--karaoke-progress, 0) * 100%),
@@ -160,7 +184,7 @@
   -webkit-text-fill-color: transparent;
 }
 
-:root[data-karaoke="false"] .lineActive .original {
+:root[data-karaoke="false"] .lineActive .original:not(:has(.wordDone, .wordActive, .wordPending)) {
   background: none;
   -webkit-text-fill-color: var(--color-text-bright);
 }

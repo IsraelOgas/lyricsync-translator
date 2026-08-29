@@ -269,6 +269,17 @@ export const SettingsPanel: React.FC<Props> = ({ isOpen, settings, onUpdateSetti
             />
           </div>
 
+          {/* Translate Lyrics */}
+          <div className={styles.toggleRow}>
+            <label className={styles.label}>Translate Lyrics</label>
+            <input
+              type="checkbox"
+              className={styles.checkbox}
+              checked={settings.translationEnabled}
+              onChange={e => onUpdateSetting('translationEnabled', e.target.checked)}
+            />
+          </div>
+
           {/* Cinema Mode */}
           <div className={styles.toggleRow}>
             <label className={styles.label}>Cinema Mode</label>

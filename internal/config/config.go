@@ -36,10 +36,17 @@ type PlayerConfig struct {
 
 type LyricsConfig struct {
 	Provider string       `yaml:"provider" json:"provider"`
+	Fallback []string     `yaml:"fallback" json:"fallback"` // ordered fallback providers, tried after the primary
 	LRCLib   LRCLibConfig `yaml:"lrclib" json:"lrclib"`
+	LrcMux   LrcMuxConfig `yaml:"lrcmux" json:"lrcmux"`
 }
 
 type LRCLibConfig struct {
+	BaseURL    string `yaml:"base_url" json:"base_url"`
+	TimeoutSec int    `yaml:"timeout_sec" json:"timeout_sec"`
+}
+
+type LrcMuxConfig struct {
 	BaseURL    string `yaml:"base_url" json:"base_url"`
 	TimeoutSec int    `yaml:"timeout_sec" json:"timeout_sec"`
 }
@@ -54,6 +61,7 @@ type DeepSeekConfig struct {
 type TranslationConfig struct {
 	Provider       string               `yaml:"provider" json:"provider"`
 	TargetLang     string               `yaml:"target_lang" json:"target_lang"`
+	Enabled        bool                 `yaml:"enabled" json:"enabled"`
 	LibreTranslate LibreTranslateConfig `yaml:"libretranslate" json:"libretranslate"`
 	DeepSeek       DeepSeekConfig       `yaml:"deepseek" json:"deepseek"`
 	Romanization   RomanizationConfig   `yaml:"romanization" json:"romanization"`
@@ -91,10 +99,15 @@ func DefaultConfig() *Config {
 				BaseURL:    "https://lrclib.net/api",
 				TimeoutSec: 15,
 			},
+			LrcMux: LrcMuxConfig{
+				BaseURL:    "https://api.lrcmux.dev",
+				TimeoutSec: 15,
+			},
 		},
 		Translation: TranslationConfig{
 			Provider:   "libretranslate",
 			TargetLang: "es",
+			Enabled:    true,
 			LibreTranslate: LibreTranslateConfig{
 				BaseURL:    "http://127.0.0.1:5000",
 				TimeoutSec: 30,

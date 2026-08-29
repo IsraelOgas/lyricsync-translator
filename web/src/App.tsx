@@ -14,10 +14,11 @@ import { SavedSongsView } from './components/SavedSongsView';
 import ErrorBoundary from './components/ErrorBoundary';
 import { apiUrl } from './api';
 import type { Settings } from './types';
+import { formatSource } from './types';
 import styles from './App.module.css';
 
 const App: React.FC = () => {
-  const { track, status, positionMs, lines, notFound, fetchingLyrics, translating, paused, lyricsError, offsetMs, handleTogglePlayPause, handleRetryLyrics, handleUpdateOffset } = usePlayerState();
+  const { track, status, positionMs, lines, notFound, fetchingLyrics, translating, paused, lyricsError, offsetMs, lyricsSource, handleTogglePlayPause, handleRetryLyrics, handleUpdateOffset } = usePlayerState();
   const { settings, updateSetting } = useSettings();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -110,7 +111,7 @@ const App: React.FC = () => {
           onUpdateDeepseekKey={handleUpdateDeepseekKey}
         />
         <HelpDialog open={helpOpen} onClose={() => setHelpOpen(false)} />
-        {!settings.cinemaMode && <NowPlayingBar track={track} status={status} view={view} onViewChange={setView} />}
+        {!settings.cinemaMode && <NowPlayingBar track={track} status={status} view={view} onViewChange={setView} source={lyricsSource} />}
 
         {/* Floating track info — only in cinema mode */}
         {settings.cinemaMode && track && (
@@ -127,6 +128,7 @@ const App: React.FC = () => {
               <span className={styles.cinemaTitle}>{track.title}</span>
               <span className={styles.cinemaArtist}>{track.artist}</span>
               {track.album && <span className={styles.cinemaAlbum}>{track.album}</span>}
+              {lyricsSource && <span className={styles.cinemaSourceBadge}>{formatSource(lyricsSource)}</span>}
             </div>
           </div>
         )}

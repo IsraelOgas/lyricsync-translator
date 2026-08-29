@@ -12,16 +12,32 @@ type LyricsProvider interface {
 
 // LyricsResult holds parsed lyrics data from a provider.
 type LyricsResult struct {
-	Source  string      `json:"source"`
-	Synced  bool        `json:"synced"`
-	Lyrics  string      `json:"lyrics"`
-	Lines   []LyricLine `json:"lines,omitempty"`
+	Source   string      `json:"source"`
+	Synced   bool        `json:"synced"`
+	Lyrics   string      `json:"lyrics"`
+	Lines    []LyricLine `json:"lines,omitempty"`
+	CoverArt *CoverArt   `json:"cover_art,omitempty"`
+}
+
+// CoverArt holds cover image URLs from a provider (typically Deezer CDN).
+type CoverArt struct {
+	Small  string `json:"small"`
+	Medium string `json:"medium"`
+	Big    string `json:"big"`
 }
 
 // LyricLine is one parsed line with optional timing.
 type LyricLine struct {
-	TimeMs *int   `json:"time_ms,omitempty"`
-	Text   string `json:"text"`
+	TimeMs *int        `json:"time_ms,omitempty"`
+	Text   string      `json:"text"`
+	Words  []LyricWord `json:"words,omitempty"`
+}
+
+// LyricWord is one word within a lyric line with optional word-level timing.
+type LyricWord struct {
+	Text    string `json:"text"`
+	StartMs int    `json:"start_ms"`
+	EndMs   int    `json:"end_ms"`
 }
 
 // NewProvider returns the configured lyrics provider by name.
@@ -29,6 +45,8 @@ func NewProvider(name, baseURL string, timeoutSec int) LyricsProvider {
 	switch name {
 	case "lrclib":
 		return NewLRCLibClient(baseURL, timeoutSec)
+	case "lrcmux":
+		return NewLrcMuxClient(baseURL, timeoutSec)
 	default:
 		return nil
 	}

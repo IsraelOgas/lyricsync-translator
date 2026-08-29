@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/joho/godotenv"
 	"github.com/wailsapp/wails/v2"
@@ -72,15 +73,50 @@ func main() {
 		log.Fatalf("Unknown translation provider: %s (expected 'libretranslate' or 'deepseek')", cfg.Translation.Provider)
 	}
 	tranSvc := translate.NewService(translator, cfg.Translation.TargetLang)
+	tranSvc.SetEnabled(cfg.Translation.Enabled)
 	fmt.Println("Translation service ready")
 
-	lyricsProvider := lyrics.NewProvider(cfg.Lyrics.Provider, cfg.Lyrics.LRCLib.BaseURL, cfg.Lyrics.LRCLib.TimeoutSec)
-	if lyricsProvider == nil {
+	var lyricsProvider lyrics.LyricsProvider
+	buildProvider := func(name string) lyrics.LyricsProvider {
+		switch name {
+		case "lrclib":
+			return lyrics.NewProvider("lrclib", cfg.Lyrics.LRCLib.BaseURL, cfg.Lyrics.LRCLib.TimeoutSec)
+		case "lrcmux":
+			return lyrics.NewProvider("lrcmux", cfg.Lyrics.LrcMux.BaseURL, cfg.Lyrics.LrcMux.TimeoutSec)
+		default:
+			return nil
+		}
+	}
+	primary := buildProvider(cfg.Lyrics.Provider)
+	if primary == nil {
 		fmt.Fprintf(os.Stderr, "Unknown lyrics provider: %s\n", cfg.Lyrics.Provider)
 		os.Exit(1)
 	}
+	chain := []lyrics.LyricsProvider{primary}
+	for _, name := range cfg.Lyrics.Fallback {
+		p := buildProvider(name)
+		if p == nil {
+			fmt.Fprintf(os.Stderr, "Unknown fallback lyrics provider: %s\n", name)
+			os.Exit(1)
+		}
+		chain = append(chain, p)
+	}
+	if len(chain) == 1 {
+		lyricsProvider = primary
+	} else {
+		lyricsProvider = lyrics.NewFallbackProvider(chain...)
+		names := make([]string, 0, len(chain))
+		for _, p := range chain {
+			names = append(names, p.Name())
+		}
+		fmt.Printf("Lyrics fallback chain: %s\n", strings.Join(names, " -> "))
+	}
+	if lyricsProvider == nil {
+		fmt.Fprintf(os.Stderr, "Failed to create lyrics provider: %s\n", cfg.Lyrics.Provider)
+		os.Exit(1)
+	}
 	lyricsSvc := lyrics.NewService(lyricsProvider, store, tranSvc)
-	fmt.Println("Lyrics service ready")
+	fmt.Printf("Lyrics service ready (provider: %s)\n", lyricsProvider.Name())
 
 	srv := api.NewServer(cfg, store, tracker, tranSvc, lyricsSvc)
 

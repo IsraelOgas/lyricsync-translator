@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"log"
 
@@ -39,6 +40,13 @@ func (s *Service) ResolveSong(ctx context.Context, artist, title, album string) 
 
 	if song != nil {
 		lines, _ := s.store.GetLyricLines(song.ID)
+
+		// Translation disabled: return lyrics without any translations/romanization
+		// and never trigger provider calls (no API cost).
+		if !s.tranSvc.Enabled() {
+			return buildSongData(song, lines, nil, false), nil
+		}
+
 		targetLang := s.tranSvc.TargetLang()
 		translations, _ := s.store.GetTranslationsBySong(song.ID, targetLang)
 
@@ -62,7 +70,7 @@ func (s *Service) ResolveSong(ctx context.Context, artist, title, album string) 
 	}
 
 	// Fetch from provider
-	log.Printf("Fetching lyrics for: %s - %s", artist, title)
+	log.Printf("Fetching lyrics for: %s - %s (provider: %s)", artist, title, s.provider.Name())
 	result, err := s.provider.SearchLyrics(artist, title)
 	if err != nil {
 		return nil, fmt.Errorf("lyrics search: %w", err)
@@ -79,9 +87,16 @@ func (s *Service) ResolveSong(ctx context.Context, artist, title, album string) 
 		Album:   album,
 		Source:  result.Source,
 	}
+	// Serialize cover art to JSON for storage.
+	if result.CoverArt != nil {
+		if b, err := json.Marshal(result.CoverArt); err == nil {
+			song.CoverArtJSON = string(b)
+		}
+	}
 	if err := s.store.SaveSong(song); err != nil {
 		return nil, fmt.Errorf("saving song: %w", err)
 	}
+	log.Printf("Cached lyrics for %s - %s (source: %s, lines: %d)", artist, title, result.Source, len(result.Lines))
 
 	// Save lyric lines
 	var cacheLines []cache.LyricLine
@@ -95,13 +110,20 @@ func (s *Service) ResolveSong(ctx context.Context, artist, title, album string) 
 		}
 		lang := translate.DetectLanguage(l.Text)
 
-		cacheLines = append(cacheLines, cache.LyricLine{
+		cl := cache.LyricLine{
 			SongID:   song.ID,
 			LineNum:  i + 1,
 			TimeMs:   timeMs,
 			Original: l.Text,
 			Lang:     lang,
-		})
+		}
+		// Serialize word-level timestamps to JSON.
+		if len(l.Words) > 0 {
+			if b, err := json.Marshal(l.Words); err == nil {
+				cl.WordsJSON = string(b)
+			}
+		}
+		cacheLines = append(cacheLines, cl)
 		origTexts = append(origTexts, l.Text)
 	}
 	if err := s.store.SaveLyricLines(song.ID, cacheLines); err != nil {
@@ -114,10 +136,13 @@ func (s *Service) ResolveSong(ctx context.Context, artist, title, album string) 
 		return nil, fmt.Errorf("reloading lines: %w", err)
 	}
 
-	// Start async translation
-	go s.translateLines(context.Background(), storedLines, origTexts)
+	// Start async translation (only when enabled).
+	if s.tranSvc.Enabled() {
+		go s.translateLines(context.Background(), storedLines, origTexts)
+		return buildSongData(song, storedLines, nil, true), nil
+	}
 
-	return buildSongData(song, storedLines, nil, true), nil
+	return buildSongData(song, storedLines, nil, false), nil
 }
 
 func (s *Service) translateLines(ctx context.Context, storedLines []cache.LyricLine, origTexts []string) {
@@ -164,26 +189,37 @@ type SongData struct {
 
 // SongInfo holds song metadata for the SSE event.
 type SongInfo struct {
-	ID         string `json:"id"`
-	HashKey    string `json:"hash_key"`
-	Artist     string `json:"artist"`
-	Title      string `json:"title"`
-	Album      string `json:"album,omitempty"`
-	DurationMs int    `json:"duration_ms,omitempty"`
-	OffsetMs   int    `json:"offset_ms"`
-	Source     string `json:"source"`
+	ID         string    `json:"id"`
+	HashKey    string    `json:"hash_key"`
+	Artist     string    `json:"artist"`
+	Title      string    `json:"title"`
+	Album      string    `json:"album,omitempty"`
+	DurationMs int       `json:"duration_ms,omitempty"`
+	OffsetMs   int       `json:"offset_ms"`
+	Source     string    `json:"source"`
+	CoverArt   *CoverArt `json:"cover_art,omitempty"`
 }
 
 // LineData holds one line of lyrics with optional romanization and translation.
 type LineData struct {
-	ID         int    `json:"id"`
-	TimeMs     *int   `json:"time_ms,omitempty"`
-	Original   string `json:"original"`
-	Romanized  string `json:"romanized,omitempty"`
-	Translated string `json:"translated,omitempty"`
+	ID         int         `json:"id"`
+	TimeMs     *int        `json:"time_ms,omitempty"`
+	Original   string      `json:"original"`
+	Romanized  string      `json:"romanized,omitempty"`
+	Translated string      `json:"translated,omitempty"`
+	Words      []LyricWord `json:"words,omitempty"`
 }
 
 func buildSongData(song *cache.Song, lines []cache.LyricLine, translations map[int]*cache.Translation, translating bool) *SongData {
+	// Deserialize cover art from cache.
+	var coverArt *CoverArt
+	if song.CoverArtJSON != "" {
+		var ca CoverArt
+		if err := json.Unmarshal([]byte(song.CoverArtJSON), &ca); err == nil {
+			coverArt = &ca
+		}
+	}
+
 	data := &SongData{
 		Type:        "lyrics",
 		Translating: translating,
@@ -196,6 +232,7 @@ func buildSongData(song *cache.Song, lines []cache.LyricLine, translations map[i
 			DurationMs: song.DurationMs,
 			OffsetMs:   song.OffsetMs,
 			Source:     song.Source,
+			CoverArt:   coverArt,
 		},
 		Lines: make([]LineData, len(lines)),
 	}
@@ -214,6 +251,13 @@ func buildSongData(song *cache.Song, lines []cache.LyricLine, translations map[i
 			if t, ok := translations[l.ID]; ok {
 				ld.Romanized = t.Romanized
 				ld.Translated = t.TranslatedText
+			}
+		}
+		// Deserialize word-level timestamps from cache.
+		if l.WordsJSON != "" {
+			var words []LyricWord
+			if err := json.Unmarshal([]byte(l.WordsJSON), &words); err == nil {
+				ld.Words = words
 			}
 		}
 		data.Lines[i] = ld

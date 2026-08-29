@@ -14,6 +14,7 @@ export interface UsePlayerStateReturn {
   paused: boolean;
   lyricsError: string | null;
   offsetMs: number;
+  lyricsSource: string | null;
   handleTogglePlayPause: () => void;
   handleRetryLyrics: () => void;
   handleUpdateOffset: (offsetMs: number) => void;
@@ -30,6 +31,7 @@ export function usePlayerState(): UsePlayerStateReturn {
   const [lyricsError, setLyricsError] = useState<string | null>(null);
   const [offsetMs, setOffsetMs] = useState(0);
   const [songHash, setSongHash] = useState<string | null>(null);
+  const [lyricsSource, setLyricsSource] = useState<string | null>(null);
 
   // Derive paused from player status reported via SSE
   const paused = status !== 'playing';
@@ -53,6 +55,7 @@ export function usePlayerState(): UsePlayerStateReturn {
           setNotFound(false);
           setFetchingLyrics(true);
           setLyricsError(null);
+          setLyricsSource(null);
         }
         break;
       case 'status':
@@ -73,6 +76,7 @@ export function usePlayerState(): UsePlayerStateReturn {
         if (event.song) {
           setOffsetMs(event.song.offset_ms ?? 0);
           setSongHash(event.song.hash_key ?? null);
+          setLyricsSource(event.song.source ?? null);
         }
         break;
       case 'lyrics_error':
@@ -106,5 +110,5 @@ export function usePlayerState(): UsePlayerStateReturn {
     }
   }, [songHash]);
 
-  return { track, status, positionMs, lines, notFound, fetchingLyrics, translating, paused, lyricsError, offsetMs, handleTogglePlayPause, handleRetryLyrics, handleUpdateOffset };
+  return { track, status, positionMs, lines, notFound, fetchingLyrics, translating, paused, lyricsError, offsetMs, lyricsSource, handleTogglePlayPause, handleRetryLyrics, handleUpdateOffset };
 }

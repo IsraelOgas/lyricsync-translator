@@ -20,6 +20,13 @@ export interface LyricLineData {
   original: string;
   romanized?: string;
   translated?: string;
+  words?: LyricWord[];
+}
+
+export interface LyricWord {
+  text: string;
+  start_ms: number;
+  end_ms: number;
 }
 
 export interface SongInfo {
@@ -31,6 +38,11 @@ export interface SongInfo {
   duration_ms?: number;
   offset_ms: number;
   source: string;
+  cover_art?: {
+    small: string;
+    medium: string;
+    big: string;
+  };
 }
 
 export interface LyricsLoadingEvent {
@@ -63,6 +75,7 @@ export interface Settings {
   cinemaMode: boolean;
   textAlignment: 'left' | 'center' | 'right';
   karaokeMode: boolean;
+  translationEnabled: boolean;
 }
 
 /** Subset of stored song for list endpoints — no lyric data. */
@@ -87,7 +100,20 @@ export const DEFAULT_SETTINGS: Settings = {
   cinemaMode: false,
   textAlignment: 'center',
   karaokeMode: true,
+  translationEnabled: true,
 };
+
+/** Human-readable lyrics source for the UI badge. */
+export function formatSource(source: string): string {
+  if (!source) return '';
+  const [provider, origin] = source.split('/');
+  const name = provider === 'lrclib' ? 'LRCLIB' : provider;
+  if (origin) {
+    const originLabel = origin === 'lrclib' ? 'LRCLIB' : origin.charAt(0).toUpperCase() + origin.slice(1);
+    return `${name} · ${originLabel}`;
+  }
+  return name;
+}
 
 // Global declarations for the Wails desktop environment.
 declare global {

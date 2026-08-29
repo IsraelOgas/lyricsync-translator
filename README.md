@@ -87,6 +87,17 @@ Abrí `http://localhost:8090`.
 
 > **Ubuntu/Debian**: AppArmor bloquea D-Bus en contenedores. El `docker-compose.yml` ya incluye `apparmor:unconfined`. Si tu UID no es 1000, ajustalo en el `Dockerfile`.
 
+## Testing
+
+```bash
+go test ./...          # tests unitarios + de integración (sin red)
+go test -short ./...   # salta los tests que llaman APIs externas
+```
+
+- `internal/api` — `inflightSet` (dedupe de resoluciones en vuelo): concurrencia, add/remove.
+- `internal/lyrics` — fallback chain (error vs. not-found, orden de providers) y cliente lrcmux.
+- El test `TestLrcMux_RealAPI` hace llamadas reales a `https://api.lrcmux.dev` y se omite con `-short`.
+
 ## Arquitectura
 
 ```
@@ -102,8 +113,11 @@ Abrí `http://localhost:8090`.
                 ┌─────────────┼─────────────┐
                 │             │             │
            playerctl      LRCLib      LibreTranslate
-            (MPRIS)      (letras)      (traducción)
+            (MPRIS)     lrcmux       (traducción)
+                        (letras)
 ```
+
+> **Letras**: LRCLib y lrcmux se pueden combinar en cadena (`lyrics.fallback`). lrcmux agrega varios orígenes (LRCLIB, Kugou, NetEase…) y devuelve timestamps a nivel de palabra + cover art.
 
 | Capa | Tecnología | Rol |
 |---|---|---|
@@ -111,7 +125,7 @@ Abrí `http://localhost:8090`.
 | Frontend | React 19, TypeScript 5.9, Vite 8 | UI con letras sincronizadas |
 | Backend | Go 1.26, chi v5 | API REST + SSE, resolución de letras |
 | Player | playerctl + MPRIS/D-Bus | Detección automática del reproductor |
-| Letras | LRCLib API | Letras sincronizadas (LRC) y plain text |
+| Letras | LRCLib API + lrcmux (fallback en cadena) | Letras sincronizadas (LRC), timestamps word-level y plain text |
 | Traducción | LibreTranslate o DeepSeek | Traducción EN→ES + romanización (JP/ZH/KO) |
 | Cache | SQLite (modernc) | Persistencia de canciones y traducciones |
 
@@ -129,10 +143,18 @@ player:
   playerctl_path: "playerctl"
 
 lyrics:
-  provider: "lrclib"
+  provider: "lrclib"            # "lrclib" o "lrcmux" (agregador con timestamps word-level + cover art)
+  fallback: []                  # providers de respaldo en orden (ver abajo)
+  lrclib:
+    base_url: "https://lrclib.net/api"
+    timeout_sec: 15
+  lrcmux:
+    base_url: "https://api.lrcmux.dev"
+    timeout_sec: 15
 
 translation:
   provider: "libretranslate"       # o "deepseek"
+  enabled: true                    # master switch: apagado = cero llamadas a API
   target_lang: "es"
   libretranslate:
     base_url: "http://127.0.0.1:5000"
@@ -144,9 +166,19 @@ cache:
   db_path: "~/.lyricsync/cache.db"
 ```
 
+Podés encadenar providers en orden con `lyrics.fallback`: si el principal falla o no encuentra la letra, se prueba el siguiente de la lista. Por ejemplo, `lrcmux` como principal con `lrclib` de respaldo:
+
+```yaml
+lyrics:
+  provider: "lrcmux"
+  fallback: ["lrclib"]
+```
+
 ### Configuración desde la UI
 
 La API key de DeepSeek se puede configurar desde el panel de **Settings → DeepSeek API Key** sin reiniciar la app. La key se guarda en `~/.config/lyricsync/config.yaml` y se aplica en caliente (hot-reload del cliente).
+
+El toggle **Translate Lyrics** (Settings, o atajo `T`) activa/desactiva toda la tubería de traducción. Cuando está apagado no se hace NINGUNA llamada a DeepSeek/LibreTranslate (costo cero), y al encenderlo se re-resuelve el track actual para arrancar las traducciones que faltan. El estado se persiste en `~/.config/lyricsync/config.yaml` y sobrevive reinicios.
 
 ### Variables de entorno
 
@@ -183,7 +215,7 @@ La API key de DeepSeek se puede configurar desde el panel de **Settings → Deep
 | GET | `/api/player/loop` | Estado de loop |
 | POST | `/api/player/loop` | Ciclar loop (none → playlist → track) |
 | GET | `/api/config` | Configuración actual (API keys sanitizadas) |
-| PUT | `/api/config` | Actualizar `target_lang` |
+| PUT | `/api/config` | Actualizar `target_lang` y/o `translation_enabled` |
 | PUT | `/api/config/provider` | Actualizar API key de provider + hot-reload |
 
 ## Eventos SSE
@@ -194,9 +226,11 @@ La API key de DeepSeek se puede configurar desde el panel de **Settings → Deep
 | `status` | servidor → cliente | `playing`, `paused`, `stopped`, `no_player` |
 | `position` | servidor → cliente | Posición en ms (cada 500ms) |
 | `lyrics_loading` | servidor → cliente | Búsqueda de letras iniciada |
-| `lyrics` | servidor → cliente | Letras + flag `translating` + `not_found` |
+| `lyrics` | servidor → cliente | Letras + flag `translating` + `not_found`; `song.source` (badge de origen) y `cover_art` si el provider los trae |
 | `lyrics_error` | servidor → cliente | Error al cargar letras o traducir (`error`, `retry`) |
 | `translations` | servidor → cliente | Traducciones completadas (merge con líneas existentes) |
+
+> **Badge de origen**: el frontend muestra de qué provider/origen salieron las letras (ej. `LRCLIB`, `lrcmux · Kugou`) en la barra Now Playing, el viewer y el modo cinema.
 
 ## Estructura del proyecto
 
@@ -206,12 +240,12 @@ lyricsync-translator/
 ├── assets.go                # go:embed del frontend compilado
 ├── wails.json               # Configuración de Wails v2
 ├── internal/
-│   ├── api/                 # HTTP server, SSE broker, handlers
-│   ├── cache/               # SQLite store
+│   ├── api/                 # HTTP server, SSE broker, handlers, inflight dedupe
+│   ├── cache/               # SQLite store (cover art + word-level timestamps)
 │   ├── config/              # Config loading + window state
-│   ├── lyrics/              # LRCLib client, LRC parser, orchestrator
+│   ├── lyrics/              # Providers (LRCLib, lrcmux), fallback chain, LRC parser, orchestrator
 │   ├── player/              # playerctl wrapper, MPRIS tracker
-│   └── translate/           # LibreTranslate + DeepSeek clients, romanizer
+│   └── translate/           # LibreTranslate + DeepSeek clients, romanizer, master toggle
 ├── web/
 │   └── src/
 │       ├── components/      # LyricsViewer, NowPlayingBar, PlayerBar, SettingsPanel, SavedSongsView, HelpDialog, ErrorBoundary
@@ -231,17 +265,23 @@ lyricsync-translator/
 
 - **App nativa**: empaquetado Wails v2, single binary, sin navegador
 - **Cinema mode**: fullscreen nativo, oculta barras de UI, widget flotante con info del track, View Transitions API para animación suave
-- **Panel de Settings**: fuente, tema (4 temas), colores, espaciado, idioma, offset de sync, API key de DeepSeek con toggle revelar/ocultar
+- **Panel de Settings**: fuente, tema (4 temas), colores, espaciado, idioma, offset de sync, toggle **Translate Lyrics**, API key de DeepSeek con toggle revelar/ocultar
 - **Configuración de API key desde la UI**: hot-reload del cliente DeepSeek sin reiniciar, persistencia en `~/.config/lyricsync/config.yaml`
 - Detección automática de **cualquier reproductor MPRIS** (Spotify, Brave, Chrome, apps)
 - Letras sincronizadas (LRC) con highlight en tiempo real + click-to-seek
+- **Doble fuente de letras**: LRCLib y **lrcmux** (agregador multi-origen), con **fallback en cadena** configurable
+- **Karaoke palabra por palabra**: cuando el provider trae timestamps word-level (lrcmux), el karaoke pinta cada palabra con su propio progreso; si no, cae al fill por línea
+- **Badge de origen de letras**: muestra de qué provider salieron (ej. `lrcmux · Kugou`) en la barra Now Playing, el viewer y cinema mode
+- **Cover art desde lrcmux**: portadas de Deezer CDN cacheadas en SQLite y servidas con la canción
+- **Toggle de traducción con costo cero**: apagado = ninguna llamada a DeepSeek/LibreTranslate; atajo `T`
+- **Dedupe en vuelo**: evita resoluciones duplicadas cuando playerctl emite múltiples track events
 - Traducción EN→ES (LibreTranslate o DeepSeek) con romanización de japonés, chino y coreano
 - **Romanización prominente**: cuando la canción tiene transliteración, se muestra más grande que el texto original
 - **Toast de error**: notificación flotante con auto-dismiss cuando falla el provider de traducción + botón Retry
 - **Retry inteligente**: reintenta traducciones vacías (API key mala → corregir → siguiente reproducción)
 - Controles del reproductor: play/pause, next/prev, seek, shuffle, loop, volumen con mute
 - Biblioteca de canciones guardadas con búsqueda
-- Atajos de teclado (`?` para ayuda)
+- Atajos de teclado (`?` para ayuda, `T` para alternar traducción, `C` para cinema mode)
 - SSE con replay de estado al reconectar + merge atómico de traducciones
 - Cache SQLite de canciones y traducciones
 - Persistencia de estado de ventana (posición, tamaño, fullscreen)

@@ -125,6 +125,12 @@ export function useKeyboardShortcuts({
           updateSetting('showRomanization', !settings.showRomanization);
           break;
 
+        case 't':
+        case 'T':
+          e.preventDefault();
+          updateSetting('translationEnabled', !settings.translationEnabled);
+          break;
+
         case 'c':
         case 'C':
           e.preventDefault();

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Music, Library } from 'lucide-react';
 import type { TrackInfo } from '../types';
+import { formatSource } from '../types';
 import styles from './NowPlayingBar.module.css';
 
 interface Props {
@@ -8,9 +9,10 @@ interface Props {
   status: string;
   view: 'now-playing' | 'saved-songs';
   onViewChange: (view: 'now-playing' | 'saved-songs') => void;
+  source?: string | null;
 }
 
-export const NowPlayingBar: React.FC<Props> = ({ track, status, view, onViewChange }) => {
+export const NowPlayingBar: React.FC<Props> = ({ track, status, view, onViewChange, source }) => {
   const tabs = (
     <div className={styles.viewTabs}>
       <button
@@ -64,6 +66,7 @@ export const NowPlayingBar: React.FC<Props> = ({ track, status, view, onViewChan
         <span className={styles.title} title={track.title}>{track.title}</span>
         <span className={styles.artist} title={track.artist}>{track.artist}</span>
         {track.album && <span className={styles.album}>{track.album}</span>}
+        {source && <span className={styles.sourceBadge}>{formatSource(source)}</span>}
       </div>
       {tabs}
       <span className={styles.status}>{status}</span>
