@@ -68,7 +68,7 @@ export const SettingsPanel: React.FC<Props> = ({ isOpen, settings, onUpdateSetti
 
           {/* Sync Offset */}
           <div className={styles.field}>
-            <label className={styles.label}>Sync Offset</label>
+            <label className={styles.label} title="Adjust lyrics timing relative to the audio, in milliseconds. Positive values delay the lyrics; negative values show them earlier.">Sync Offset</label>
             <div className={styles.sliderRow}>
               <input
                 type="range"
@@ -78,6 +78,7 @@ export const SettingsPanel: React.FC<Props> = ({ isOpen, settings, onUpdateSetti
                 step={100}
                 value={offsetMs}
                 onChange={e => onUpdateOffset(Number(e.target.value))}
+                title="Drag to fine-tune when each line appears (milliseconds)."
               />
               <span className={styles.sliderValue}>{offsetMs > 0 ? '+' : ''}{(offsetMs / 1000).toFixed(1)}s</span>
             </div>
@@ -85,7 +86,7 @@ export const SettingsPanel: React.FC<Props> = ({ isOpen, settings, onUpdateSetti
 
           {/* Font Size */}
           <div className={styles.field}>
-            <label className={styles.label}>Font Size</label>
+            <label className={styles.label} title="Size of the lyrics text, in pixels.">Font Size</label>
             <div className={styles.sliderRow}>
               <input
                 type="range"
@@ -94,6 +95,7 @@ export const SettingsPanel: React.FC<Props> = ({ isOpen, settings, onUpdateSetti
                 max={40}
                 value={settings.fontSize}
                 onChange={e => onUpdateSetting('fontSize', Number(e.target.value))}
+                title="Bigger values make the lyrics easier to read from a distance."
               />
               <span className={styles.sliderValue}>{settings.fontSize}px</span>
             </div>
@@ -101,13 +103,14 @@ export const SettingsPanel: React.FC<Props> = ({ isOpen, settings, onUpdateSetti
 
           {/* Font Family */}
           <div className={styles.field}>
-            <label className={styles.label}>Font</label>
+            <label className={styles.label} title="Font family used for the lyrics text.">Font</label>
             <div className={styles.chipRow}>
               {FONTS.map(f => (
                 <button
                   key={f.value}
                   className={`${styles.chip} ${settings.fontFamily === f.value ? styles.chipActive : ''}`}
                   onClick={() => onUpdateSetting('fontFamily', f.value)}
+                  title={`Use the "${f.label}" font for lyrics.`}
                 >
                   {f.label}
                 </button>
@@ -117,13 +120,14 @@ export const SettingsPanel: React.FC<Props> = ({ isOpen, settings, onUpdateSetti
 
           {/* Text Alignment */}
           <div className={styles.field}>
-            <label className={styles.label}>Text Alignment</label>
+            <label className={styles.label} title="Horizontal alignment of the lyrics lines on screen.">Text Alignment</label>
             <div className={styles.chipRow}>
               {ALIGNMENTS.map(a => (
                 <button
                   key={a.value}
                   className={`${styles.chip} ${settings.textAlignment === a.value ? styles.chipActive : ''}`}
                   onClick={() => onUpdateSetting('textAlignment', a.value)}
+                  title={`Align lyrics to the ${a.label.toLowerCase()}.`}
                 >
                   {a.label}
                 </button>
@@ -133,13 +137,14 @@ export const SettingsPanel: React.FC<Props> = ({ isOpen, settings, onUpdateSetti
 
           {/* Target Language */}
           <div className={styles.field}>
-            <label className={styles.label}>Translate to</label>
+            <label className={styles.label} title="Language the lyrics are translated into. Uses the active translation provider (DeepSeek or LibreTranslate).">Translate to</label>
             <div className={styles.chipRow}>
               {LANGUAGES.map(l => (
                 <button
                   key={l.value}
                   className={`${styles.chip} ${settings.targetLang === l.value ? styles.chipActive : ''}`}
                   onClick={() => onUpdateSetting('targetLang', l.value)}
+                  title={`Translate lyrics to ${l.label}.`}
                 >
                   {l.label}
                 </button>
@@ -149,7 +154,7 @@ export const SettingsPanel: React.FC<Props> = ({ isOpen, settings, onUpdateSetti
 
           {/* DeepSeek API Key */}
           <div className={styles.field}>
-            <label className={styles.label}>
+            <label className={styles.label} title="API key for the DeepSeek translation provider. Saved to ~/.config/lyricsync/config.yaml and applied without restarting.">
               DeepSeek API Key
               {deepseekApiKey && !localKey && (
                 <span className={styles.configuredBadge}>✓ configured</span>
@@ -185,12 +190,14 @@ export const SettingsPanel: React.FC<Props> = ({ isOpen, settings, onUpdateSetti
                     setTimeout(() => setSaved(false), 2000);
                   }
                 }}
+                title="Required when the translation provider is DeepSeek. Press Enter or blur to save."
               />
               <button
                 type="button"
                 className={styles.iconBtn}
                 onClick={() => setShowKey(!showKey)}
                 aria-label={showKey ? 'Hide API key' : 'Show API key'}
+                title={showKey ? 'Hide the API key' : 'Reveal the API key'}
               >
                 {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
@@ -199,7 +206,7 @@ export const SettingsPanel: React.FC<Props> = ({ isOpen, settings, onUpdateSetti
 
           {/* Line Spacing */}
           <div className={styles.field}>
-            <label className={styles.label}>Line Spacing</label>
+            <label className={styles.label} title="Vertical space between lyric lines. Higher values reduce visual crowding.">Line Spacing</label>
             <div className={styles.sliderRow}>
               <input
                 type="range"
@@ -209,6 +216,7 @@ export const SettingsPanel: React.FC<Props> = ({ isOpen, settings, onUpdateSetti
                 step={0.1}
                 value={settings.lineSpacing}
                 onChange={e => onUpdateSetting('lineSpacing', Number(e.target.value))}
+                title="Adjust the gap between lines (1 = tight, 2.5 = airy)."
               />
               <span className={styles.sliderValue}>{settings.lineSpacing}</span>
             </div>
@@ -216,13 +224,14 @@ export const SettingsPanel: React.FC<Props> = ({ isOpen, settings, onUpdateSetti
 
           {/* Theme */}
           <div className={styles.field}>
-            <label className={styles.label}>Theme</label>
+            <label className={styles.label} title="Color theme applied to the whole app.">Theme</label>
             <div className={styles.chipRow}>
               {THEMES.map(t => (
                 <button
                   key={t.value}
                   className={`${styles.chip} ${settings.theme === t.value ? styles.chipActive : ''}`}
                   onClick={() => onUpdateSetting('theme', t.value)}
+                  title={`Switch to the "${t.label}" theme.`}
                 >
                   {t.label}
                 </button>
@@ -232,13 +241,14 @@ export const SettingsPanel: React.FC<Props> = ({ isOpen, settings, onUpdateSetti
 
           {/* Romanization Color */}
           <div className={styles.field}>
-            <label className={styles.label}>Romanization Color</label>
+            <label className={styles.label} title="Color of the romanized text (transliteration of Japanese, Chinese, Korean).">Romanization Color</label>
             <div className={styles.colorRow}>
               <input
                 type="color"
                 className={styles.colorInput}
                 value={settings.romanizationColor}
                 onChange={e => onUpdateSetting('romanizationColor', e.target.value)}
+                title="Pick the color used for romanized lyrics."
               />
               <span className={styles.colorValue}>{settings.romanizationColor}</span>
             </div>
@@ -246,13 +256,14 @@ export const SettingsPanel: React.FC<Props> = ({ isOpen, settings, onUpdateSetti
 
           {/* Translation Color */}
           <div className={styles.field}>
-            <label className={styles.label}>Translation Color</label>
+            <label className={styles.label} title="Color of the translated lyrics text.">Translation Color</label>
             <div className={styles.colorRow}>
               <input
                 type="color"
                 className={styles.colorInput}
                 value={settings.translationColor}
                 onChange={e => onUpdateSetting('translationColor', e.target.value)}
+                title="Pick the color used for translated lyrics."
               />
               <span className={styles.colorValue}>{settings.translationColor}</span>
             </div>
@@ -260,7 +271,7 @@ export const SettingsPanel: React.FC<Props> = ({ isOpen, settings, onUpdateSetti
 
           {/* Show Romanization */}
           <div className={styles.toggleRow}>
-            <label className={styles.label}>Show Romanization</label>
+            <label className={styles.label} title="Show the romanized (transliterated) text under non-Latin lyrics (Japanese, Chinese, Korean). ON shows it; OFF hides it.">Show Romanization</label>
             <input
               type="checkbox"
               className={styles.checkbox}
@@ -271,7 +282,7 @@ export const SettingsPanel: React.FC<Props> = ({ isOpen, settings, onUpdateSetti
 
           {/* Translate Lyrics */}
           <div className={styles.toggleRow}>
-            <label className={styles.label}>Translate Lyrics</label>
+            <label className={styles.label} title="Enable or disable the translation pipeline. ON translates lyrics via the configured provider (uses API tokens); OFF makes zero provider calls (no cost).">Translate Lyrics</label>
             <input
               type="checkbox"
               className={styles.checkbox}
@@ -282,7 +293,7 @@ export const SettingsPanel: React.FC<Props> = ({ isOpen, settings, onUpdateSetti
 
           {/* Cinema Mode */}
           <div className={styles.toggleRow}>
-            <label className={styles.label}>Cinema Mode</label>
+            <label className={styles.label} title="Fullscreen immersive mode with an animated background, floating track info, and hidden UI bars. ON enables it; OFF returns to the normal view.">Cinema Mode</label>
             <input
               type="checkbox"
               className={styles.checkbox}
@@ -291,9 +302,9 @@ export const SettingsPanel: React.FC<Props> = ({ isOpen, settings, onUpdateSetti
             />
           </div>
 
-          {/* Karaoke Fill */}
+          {/* Karaoke */}
           <div className={styles.toggleRow}>
-            <label className={styles.label}>Karaoke Fill</label>
+            <label className={styles.label} title="Karaoke highlighting. ON requests word-level timestamps from lrcmux and paints word-by-word when available (falls back to line fill otherwise); OFF requests line-level (cached, free) with no painting.">Karaoke</label>
             <input
               type="checkbox"
               className={styles.checkbox}

@@ -126,6 +126,11 @@ export function useSettings(): UseSettingsReturn {
             next.targetLang = lang;
             changed = true;
           }
+          const wl = data?.lyrics?.level;
+          if (typeof wl === 'string' && (wl === 'word') !== prev.karaokeMode) {
+            next.karaokeMode = wl === 'word';
+            changed = true;
+          }
           if (changed) {
             saveToStorage(next);
             return next;
@@ -159,6 +164,16 @@ export function useSettings(): UseSettingsReturn {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ translation_enabled: value }),
+        }).catch(() => {}); // non-blocking — backend keeps its current state if unreachable
+      }
+
+      // Sync karaoke on/off to backend: ON requests word-level (rate-limited),
+      // OFF requests line-level (cached by lrcmux, free).
+      if (key === 'karaokeMode') {
+        fetch(apiUrl('/api/config'), {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lyrics_level: value ? 'word' : 'line' }),
         }).catch(() => {}); // non-blocking — backend keeps its current state if unreachable
       }
 

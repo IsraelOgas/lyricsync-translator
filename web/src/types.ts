@@ -17,6 +17,7 @@ export interface TrackerEvent {
 export interface LyricLineData {
   id: number;
   time_ms: number | null;
+  end_ms?: number;
   original: string;
   romanized?: string;
   translated?: string;
@@ -38,6 +39,8 @@ export interface SongInfo {
   duration_ms?: number;
   offset_ms: number;
   source: string;
+  isrc?: string;
+  sync_level?: string; // "word" | "line" | "none" — actual sync level served
   cover_art?: {
     small: string;
     medium: string;
@@ -99,7 +102,7 @@ export const DEFAULT_SETTINGS: Settings = {
   targetLang: 'es',
   cinemaMode: false,
   textAlignment: 'center',
-  karaokeMode: true,
+  karaokeMode: false,
   translationEnabled: true,
 };
 

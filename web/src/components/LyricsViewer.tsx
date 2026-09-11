@@ -14,7 +14,7 @@ interface Props {
   lyricsError?: string | null;
   onRetry?: () => void;
   showRomanization?: boolean;
-  karaokeMode?: boolean;
+  karaoke?: boolean;
   /** When true, suppresses position sync and click-to-seek for static display. */
   staticMode?: boolean;
 }
@@ -25,7 +25,7 @@ interface WordState {
   progress: number; // 0..1 for current word, -1 pending, 1 done
 }
 
-export const LyricsViewer: React.FC<Props> = ({ lines, positionMs, offsetMs, paused, notFound, fetchingLyrics, translating, lyricsError, onRetry, showRomanization = true, karaokeMode = true, staticMode = false }) => {
+export const LyricsViewer: React.FC<Props> = ({ lines, positionMs, offsetMs, paused, notFound, fetchingLyrics, translating, lyricsError, onRetry, showRomanization = true, karaoke = true, staticMode = false }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [activeIdx, setActiveIdx] = useState(-1);
   const [toastVisible, setToastVisible] = useState(false);
@@ -79,32 +79,34 @@ export const LyricsViewer: React.FC<Props> = ({ lines, positionMs, offsetMs, pau
 
     setActiveIdx(syncedLines[best].origIdx);
 
-    if (karaokeMode) {
-      const activeLine = syncedLines[best];
+    const activeLine = syncedLines[best];
 
-      // Word-level karaoke: calculate progress for each word.
-      if (activeLine.words && activeLine.words.length > 0) {
-        const states: WordState[] = activeLine.words.map((w) => {
-          const duration = Math.max(w.end_ms - w.start_ms, 1);
-          const raw = (effectiveMs - w.start_ms) / duration;
-          if (raw <= 0) return { text: w.text, progress: -1 };   // pending
-          if (raw >= 1) return { text: w.text, progress: 1 };     // done
-          return { text: w.text, progress: Math.min(1, Math.max(0, raw)) }; // active
-        });
-        setWordStates(states);
-        setKaraokeProgress(0); // not used in word mode
-      } else {
-        // Line-level fallback.
-        const nextLine = syncedLines.find((l, i) => i > best && l.time_ms != null);
-        const lineStart = activeLine.time_ms ?? 0;
-        const lineEnd = nextLine?.time_ms ?? (lineStart + 4000);
-        const duration = Math.max(lineEnd - lineStart, 1);
-        const progress = Math.min(1, Math.max(0, (effectiveMs - lineStart) / duration));
-        setKaraokeProgress(progress);
-        setWordStates([]);
-      }
+    // Word-level karaoke: paint each word with its own progress.
+    if (karaoke && activeLine.words && activeLine.words.length > 0) {
+      const states: WordState[] = activeLine.words.map((w) => {
+        const duration = Math.max(w.end_ms - w.start_ms, 1);
+        const raw = (effectiveMs - w.start_ms) / duration;
+        if (raw <= 0) return { text: w.text, progress: -1 };   // pending
+        if (raw >= 1) return { text: w.text, progress: 1 };     // done
+        return { text: w.text, progress: Math.min(1, Math.max(0, raw)) }; // active
+      });
+      setWordStates(states);
+      setKaraokeProgress(0); // not used in word mode
+    } else if (karaoke) {
+      // Line-level fill: only when the Karaoke toggle is ON and no word data.
+      const nextLine = syncedLines.find((l, i) => i > best && l.time_ms != null);
+      const lineStart = activeLine.time_ms ?? 0;
+      const lineEnd = activeLine.end_ms ?? nextLine?.time_ms ?? (lineStart + 4000);
+      const duration = Math.max(lineEnd - lineStart, 1);
+      const progress = Math.min(1, Math.max(0, (effectiveMs - lineStart) / duration));
+      setKaraokeProgress(progress);
+      setWordStates([]);
+    } else {
+      // Neither word karaoke nor line fill: clear any stale paint state.
+      setWordStates([]);
+      setKaraokeProgress(0);
     }
-  }, [effectiveMs, lines, paused, karaokeMode]);
+  }, [effectiveMs, lines, paused, karaoke]);
 
   useEffect(() => {
     if (staticMode || paused) return;
@@ -186,7 +188,7 @@ export const LyricsViewer: React.FC<Props> = ({ lines, positionMs, offsetMs, pau
     }
 
     // Word-level on inactive lines: render spans but no progress classes.
-    if (line.words && line.words.length > 0) {
+    if (karaoke && line.words && line.words.length > 0) {
       return (
         <p className={styles.original}>
           {line.words.map((w, wi) => (
@@ -223,7 +225,7 @@ export const LyricsViewer: React.FC<Props> = ({ lines, positionMs, offsetMs, pau
             key={line.id || idx}
             data-active={isActive}
             className={`${styles.line} ${isActive ? styles.lineActive : styles.lineInactive} ${isClickable ? styles.clickable : ''}`}
-            style={isActive && karaokeMode && !hasWordKaraoke ? { '--karaoke-progress': karaokeProgress } as React.CSSProperties : undefined}
+            style={isActive && karaoke && !hasWordKaraoke ? { '--karaoke-progress': karaokeProgress } as React.CSSProperties : undefined}
             onClick={isClickable ? () => handleLineClick(line.time_ms!) : undefined}
             title={isClickable ? (isInstrumental ? 'Instrumental' : 'Click to jump to this verse') : undefined}
           >
