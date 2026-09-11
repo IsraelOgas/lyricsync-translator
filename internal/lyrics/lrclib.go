@@ -39,22 +39,32 @@ type lrclibTrack struct {
 	ArtistName   string  `json:"artistName"`
 	AlbumName    string  `json:"albumName"`
 	Duration     float64 `json:"duration"`
-	SyncedLyrics string `json:"syncedLyrics"`
-	PlainLyrics  string `json:"plainLyrics"`
+	Isrc         string  `json:"isrc"`
+	SyncedLyrics string  `json:"syncedLyrics"`
+	PlainLyrics  string  `json:"plainLyrics"`
 }
 
 // SearchLyrics searches for lyrics using the LRCLIB get endpoint.
-func (c *LRCLibClient) SearchLyrics(artist, title string) (*LyricsResult, error) {
+// level is ignored: LRCLIB has no sync-level request parameter.
+// isrc is the track ISRC if known; LRCLIB supports it as a query param.
+func (c *LRCLibClient) SearchLyrics(artist, title string, durationMs int, level string, isrc string) (*LyricsResult, error) {
 	// Try direct get first
 	endpoint := fmt.Sprintf("%s/get", c.baseURL)
 	params := url.Values{}
 	params.Set("artist_name", artist)
 	params.Set("track_name", title)
+	if durationMs > 0 {
+		params.Set("duration", fmt.Sprintf("%.1f", float64(durationMs)/1000.0))
+	}
+	if isrc != "" {
+		params.Set("isrc", isrc)
+	}
 
 	req, err := http.NewRequest("GET", endpoint+"?"+params.Encode(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)
 	}
+	req.Header.Set("User-Agent", userAgent)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -76,8 +86,18 @@ func (c *LRCLibClient) SearchLyrics(artist, title string) (*LyricsResult, error)
 		return nil, fmt.Errorf("decoding lrclib response: %w", err)
 	}
 
+	// LRCLIB never returns word-level timestamps: synced lyrics are line-level,
+	// plain lyrics are unsynced.
+	syncLevel := "none"
+	if track.SyncedLyrics != "" {
+		syncLevel = "line"
+	}
+
 	result := &LyricsResult{
-		Source: "lrclib",
+		Source:     "lrclib",
+		SyncLevel:  syncLevel,
+		ISRC:       track.Isrc,
+		DurationMs: int(track.Duration * 1000),
 	}
 
 	// Prefer synced lyrics

@@ -14,7 +14,7 @@ type mockProvider struct {
 }
 
 func (m *mockProvider) Name() string { return m.name }
-func (m *mockProvider) SearchLyrics(artist, title string) (*LyricsResult, error) {
+func (m *mockProvider) SearchLyrics(artist, title string, durationMs int, level string, isrc string) (*LyricsResult, error) {
 	if m.calls != nil {
 		*m.calls++
 	}
@@ -141,7 +141,7 @@ func TestFallbackProvider_SearchLyrics(t *testing.T) {
 			providers, verify := tt.providers()
 			fb := NewFallbackProvider(providers...)
 
-			result, err := fb.SearchLyrics("artist", "title")
+			result, err := fb.SearchLyrics("artist", "title", 0, "line", "")
 
 			if tt.wantErr {
 				if err == nil {

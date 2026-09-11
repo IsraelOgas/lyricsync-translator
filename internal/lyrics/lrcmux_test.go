@@ -24,7 +24,7 @@ func TestLrcMux_RealAPI(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(fmt.Sprintf("%s-%s", tt.artist, tt.title), func(t *testing.T) {
-			result, err := client.SearchLyrics(tt.artist, tt.title)
+			result, err := client.SearchLyrics(tt.artist, tt.title, 0, "word", "")
 			if err != nil {
 				t.Fatalf("SearchLyrics error: %v", err)
 			}
@@ -41,6 +41,8 @@ func TestLrcMux_RealAPI(t *testing.T) {
 				}
 				t.Logf("Artist: %s - Title: %s", tt.artist, tt.title)
 				t.Logf("  Source: %s", result.Source)
+				t.Logf("  ISRC: %s", result.ISRC)
+				t.Logf("  DurationMs: %d", result.DurationMs)
 				t.Logf("  Lines: %d", len(result.Lines))
 
 				// Verify cover art.

@@ -10,6 +10,8 @@ type Song struct {
 	Title        string    `json:"title"`
 	Album        string    `json:"album,omitempty"`
 	DurationMs   int       `json:"duration_ms,omitempty"`
+	ISRC         string    `json:"isrc,omitempty"`
+	SyncLevel    string    `json:"sync_level,omitempty"`
 	OffsetMs     int       `json:"offset_ms"`
 	Source       string    `json:"source"`
 	CoverArtJSON string    `json:"cover_art_json,omitempty"`
@@ -22,6 +24,7 @@ type LyricLine struct {
 	SongID    string `json:"song_id"`
 	LineNum   int    `json:"line_num"`
 	TimeMs    *int   `json:"time_ms,omitempty"`
+	EndMs     *int   `json:"end_ms,omitempty"`
 	Original  string `json:"original"`
 	Lang      string `json:"lang,omitempty"`
 	WordsJSON string `json:"words_json,omitempty"`

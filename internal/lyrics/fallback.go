@@ -28,11 +28,11 @@ func (f *FallbackProvider) Name() string { return "fallback" }
 // surface that error: the chain could NOT confirm the track is absent, so the
 // caller can retry (e.g. a transient 429). "Not found" (nil, nil) is only
 // reported when every provider answered without error.
-func (f *FallbackProvider) SearchLyrics(artist, title string) (*LyricsResult, error) {
+func (f *FallbackProvider) SearchLyrics(artist, title string, durationMs int, level string, isrc string) (*LyricsResult, error) {
 	var lastErr error
 
 	for _, p := range f.providers {
-		result, err := p.SearchLyrics(artist, title)
+		result, err := p.SearchLyrics(artist, title, durationMs, level, isrc)
 		if err != nil {
 			log.Printf("fallback: provider %s failed: %v", p.Name(), err)
 			lastErr = err

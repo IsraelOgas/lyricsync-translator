@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"time"
 )
 
@@ -55,10 +56,10 @@ type lrcmuxCover struct {
 }
 
 type lrcmuxLine struct {
-	Text  string        `json:"text"`
-	Start int           `json:"start"`
-	End   int           `json:"end"`
-	Words []lrcmuxWord  `json:"words"`
+	Text  string       `json:"text"`
+	Start int          `json:"start"`
+	End   int          `json:"end"`
+	Words []lrcmuxWord `json:"words"`
 }
 
 type lrcmuxWord struct {
@@ -68,8 +69,9 @@ type lrcmuxWord struct {
 }
 
 type lrcmuxMeta struct {
-	Source lrcmuxSource `json:"source"`
-	Level  string       `json:"level"`
+	Source       lrcmuxSource `json:"source"`
+	Level        string       `json:"level"`
+	Instrumental bool         `json:"instrumental"`
 }
 
 type lrcmuxSource struct {
@@ -79,17 +81,29 @@ type lrcmuxSource struct {
 }
 
 // SearchLyrics fetches lyrics from the lrcmux native endpoint.
-func (c *LrcMuxClient) SearchLyrics(artist, title string) (*LyricsResult, error) {
+// level is the requested sync level: "line" (default) or "word".
+// isrc is the track ISRC if known; it takes priority over artist/title.
+func (c *LrcMuxClient) SearchLyrics(artist, title string, durationMs int, level string, isrc string) (*LyricsResult, error) {
 	endpoint := fmt.Sprintf("%s/get", c.baseURL)
 	params := url.Values{}
 	params.Set("artist", artist)
 	params.Set("title", title)
-	params.Set("level", "word") // request word-level timestamps
+	if level == "" {
+		level = "line"
+	}
+	params.Set("level", level) // "line" (default) or "word"
+	if durationMs > 0 {
+		params.Set("duration", strconv.Itoa(durationMs/1000))
+	}
+	if isrc != "" {
+		params.Set("isrc", isrc)
+	}
 
 	req, err := http.NewRequest("GET", endpoint+"?"+params.Encode(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("lrcmux: creating request: %w", err)
 	}
+	req.Header.Set("User-Agent", userAgent)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -111,13 +125,36 @@ func (c *LrcMuxClient) SearchLyrics(artist, title string) (*LyricsResult, error)
 		return nil, fmt.Errorf("lrcmux: decoding response: %w", err)
 	}
 
+	// Prefer the provider's official source name for the badge; fall back to
+	// the source id when the API omits the name.
+	srcName := data.Meta.Source.Name
+	if srcName == "" {
+		srcName = data.Meta.Source.ID
+	}
+
+	// Instrumental tracks come back with meta.instrumental=true and empty
+	// lines. Return an instrumental result so the app renders the "— ♪ —"
+	// placeholder instead of "Lyrics not found".
+	if data.Meta.Instrumental {
+		return &LyricsResult{
+			Source:       fmt.Sprintf("lrcmux/%s", srcName),
+			Instrumental: true,
+			SyncLevel:    "none",
+			ISRC:         data.Track.ISRC,
+			DurationMs:   int(data.Track.Duration) * 1000,
+		}, nil
+	}
+
 	if len(data.Lines) == 0 {
 		return nil, nil
 	}
 
 	result := &LyricsResult{
-		Source: fmt.Sprintf("lrcmux/%s", data.Meta.Source.ID),
-		Synced: true,
+		Source:     fmt.Sprintf("lrcmux/%s", srcName),
+		Synced:     true,
+		SyncLevel:  data.Meta.Level,
+		ISRC:       data.Track.ISRC,
+		DurationMs: int(data.Track.Duration) * 1000,
 	}
 
 	// Map cover art from lrcmux response (Deezer CDN).
@@ -142,6 +179,13 @@ func (c *LrcMuxClient) SearchLyrics(artist, title string) (*LyricsResult, error)
 			t = nil
 		}
 
+		// Map the line end timestamp when present (karaoke fill uses it).
+		var endMs *int
+		if l.End > 0 {
+			e := l.End
+			endMs = &e
+		}
+
 		// Map word-level timestamps.
 		var words []LyricWord
 		for _, w := range l.Words {
@@ -154,6 +198,7 @@ func (c *LrcMuxClient) SearchLyrics(artist, title string) (*LyricsResult, error)
 
 		result.Lines = append(result.Lines, LyricLine{
 			TimeMs: t,
+			EndMs:  endMs,
 			Text:   l.Text,
 			Words:  words,
 		})

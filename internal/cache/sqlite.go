@@ -48,6 +48,8 @@ func (s *Store) Migrate() error {
 		duration_ms INTEGER,
 		offset_ms INTEGER NOT NULL DEFAULT 0,
 		source TEXT NOT NULL DEFAULT 'lrclib',
+		sync_level TEXT,
+		isrc TEXT,
 		cover_art_json TEXT,
 		created_at TEXT NOT NULL DEFAULT (datetime('now'))
 	);
@@ -56,6 +58,7 @@ func (s *Store) Migrate() error {
 		song_id TEXT NOT NULL REFERENCES songs(id),
 		line_num INTEGER NOT NULL,
 		time_ms INTEGER,
+		end_ms INTEGER,
 		original TEXT NOT NULL,
 		lang TEXT,
 		words_json TEXT,
@@ -79,7 +82,10 @@ func (s *Store) Migrate() error {
 		"ALTER TABLE translations ADD COLUMN translated_text TEXT",
 		"ALTER TABLE translations ADD COLUMN target_lang TEXT NOT NULL DEFAULT 'es'",
 		"ALTER TABLE songs ADD COLUMN cover_art_json TEXT",
+		"ALTER TABLE songs ADD COLUMN isrc TEXT",
+		"ALTER TABLE songs ADD COLUMN sync_level TEXT",
 		"ALTER TABLE lyric_lines ADD COLUMN words_json TEXT",
+		"ALTER TABLE lyric_lines ADD COLUMN end_ms INTEGER",
 	}
 	for _, m := range migrations {
 		s.db.Exec(m) // ignore errors — column may already exist
@@ -95,16 +101,24 @@ func HashKey(artist, title, album string) string {
 }
 
 func (s *Store) GetSongByHash(hashKey string) (*Song, error) {
-	row := s.db.QueryRow("SELECT id, hash_key, artist, title, album, duration_ms, offset_ms, source, cover_art_json, created_at FROM songs WHERE hash_key = ?", hashKey)
+	row := s.db.QueryRow("SELECT id, hash_key, artist, title, album, duration_ms, offset_ms, source, isrc, sync_level, cover_art_json, created_at FROM songs WHERE hash_key = ?", hashKey)
 	var song Song
 	var createdAt string
 	var coverArtJSON sql.NullString
-	err := row.Scan(&song.ID, &song.HashKey, &song.Artist, &song.Title, &song.Album, &song.DurationMs, &song.OffsetMs, &song.Source, &coverArtJSON, &createdAt)
+	var isrc sql.NullString
+	var syncLevel sql.NullString
+	err := row.Scan(&song.ID, &song.HashKey, &song.Artist, &song.Title, &song.Album, &song.DurationMs, &song.OffsetMs, &song.Source, &isrc, &syncLevel, &coverArtJSON, &createdAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
+	}
+	if isrc.Valid {
+		song.ISRC = isrc.String
+	}
+	if syncLevel.Valid {
+		song.SyncLevel = syncLevel.String
 	}
 	if coverArtJSON.Valid {
 		song.CoverArtJSON = coverArtJSON.String
@@ -124,15 +138,15 @@ func (s *Store) SaveSong(song *Song) error {
 		song.Source = "lrclib"
 	}
 	_, err := s.db.Exec(
-		`INSERT OR REPLACE INTO songs (id, hash_key, artist, title, album, duration_ms, offset_ms, source, cover_art_json, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-		song.ID, song.HashKey, song.Artist, song.Title, song.Album, song.DurationMs, song.OffsetMs, song.Source, song.CoverArtJSON,
+		`INSERT OR REPLACE INTO songs (id, hash_key, artist, title, album, duration_ms, offset_ms, source, isrc, sync_level, cover_art_json, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+		song.ID, song.HashKey, song.Artist, song.Title, song.Album, song.DurationMs, song.OffsetMs, song.Source, song.ISRC, song.SyncLevel, song.CoverArtJSON,
 	)
 	return err
 }
 
 func (s *Store) GetLyricLines(songID string) ([]LyricLine, error) {
-	rows, err := s.db.Query("SELECT id, song_id, line_num, time_ms, original, lang, words_json FROM lyric_lines WHERE song_id = ? ORDER BY line_num", songID)
+	rows, err := s.db.Query("SELECT id, song_id, line_num, time_ms, end_ms, original, lang, words_json FROM lyric_lines WHERE song_id = ? ORDER BY line_num", songID)
 	if err != nil {
 		return nil, err
 	}
@@ -141,10 +155,15 @@ func (s *Store) GetLyricLines(songID string) ([]LyricLine, error) {
 	var lines []LyricLine
 	for rows.Next() {
 		var l LyricLine
+		var endMs sql.NullInt64
 		var wordsJSON sql.NullString
-		err := rows.Scan(&l.ID, &l.SongID, &l.LineNum, &l.TimeMs, &l.Original, &l.Lang, &wordsJSON)
+		err := rows.Scan(&l.ID, &l.SongID, &l.LineNum, &l.TimeMs, &endMs, &l.Original, &l.Lang, &wordsJSON)
 		if err != nil {
 			return nil, err
+		}
+		if endMs.Valid {
+			e := int(endMs.Int64)
+			l.EndMs = &e
 		}
 		if wordsJSON.Valid {
 			l.WordsJSON = wordsJSON.String
@@ -155,14 +174,25 @@ func (s *Store) GetLyricLines(songID string) ([]LyricLine, error) {
 }
 
 func (s *Store) SaveLyricLines(songID string, lines []LyricLine) error {
-	stmt, err := s.db.Prepare("INSERT OR REPLACE INTO lyric_lines (song_id, line_num, time_ms, original, lang, words_json) VALUES (?, ?, ?, ?, ?, ?)")
+	// UPSERT instead of INSERT OR REPLACE: when the same (song_id, line_num)
+	// is re-saved (e.g. upgrading line→word level), the existing row ID is
+	// preserved so translations (which reference lyric_lines.id) survive.
+	stmt, err := s.db.Prepare(`
+    INSERT INTO lyric_lines (song_id, line_num, time_ms, end_ms, original, lang, words_json)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(song_id, line_num) DO UPDATE SET
+        time_ms = excluded.time_ms,
+        end_ms = excluded.end_ms,
+        original = excluded.original,
+        lang = excluded.lang,
+        words_json = excluded.words_json`)
 	if err != nil {
 		return err
 	}
 	defer stmt.Close()
 
 	for _, l := range lines {
-		_, err := stmt.Exec(songID, l.LineNum, l.TimeMs, l.Original, l.Lang, l.WordsJSON)
+		_, err := stmt.Exec(songID, l.LineNum, l.TimeMs, l.EndMs, l.Original, l.Lang, l.WordsJSON)
 		if err != nil {
 			return err
 		}
@@ -226,7 +256,7 @@ func (s *Store) GetSongOffset(hashKey string) (int, error) {
 
 func (s *Store) ListSongs(search string) ([]Song, error) {
 	rows, err := s.db.Query(
-		`SELECT id, hash_key, artist, title, album, duration_ms, offset_ms, source, cover_art_json, created_at
+		`SELECT id, hash_key, artist, title, album, duration_ms, offset_ms, source, isrc, sync_level, cover_art_json, created_at
 		 FROM songs
 		 WHERE ? = '' OR artist LIKE ? OR title LIKE ? OR album LIKE ?
 		 ORDER BY created_at DESC`,
@@ -242,10 +272,18 @@ func (s *Store) ListSongs(search string) ([]Song, error) {
 		var song Song
 		var createdAt string
 		var coverArtJSON sql.NullString
+		var isrc sql.NullString
+		var syncLevel sql.NullString
 		err := rows.Scan(&song.ID, &song.HashKey, &song.Artist, &song.Title, &song.Album,
-			&song.DurationMs, &song.OffsetMs, &song.Source, &coverArtJSON, &createdAt)
+			&song.DurationMs, &song.OffsetMs, &song.Source, &isrc, &syncLevel, &coverArtJSON, &createdAt)
 		if err != nil {
 			return nil, err
+		}
+		if isrc.Valid {
+			song.ISRC = isrc.String
+		}
+		if syncLevel.Valid {
+			song.SyncLevel = syncLevel.String
 		}
 		if coverArtJSON.Valid {
 			song.CoverArtJSON = coverArtJSON.String

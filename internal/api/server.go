@@ -253,7 +253,7 @@ func (s *Server) pipeTrackerEvents(ctx context.Context) {
 			var evt player.TrackerEvent
 			if err := json.Unmarshal(event, &evt); err == nil && evt.Type == "track" && evt.Track != nil {
 				s.lastTrackPayload = event
-				s.launchLyricsResolve(ctx, evt.Track)
+				s.launchLyricsResolve(ctx, evt.Track, false)
 			}
 		}
 	}
@@ -261,7 +261,7 @@ func (s *Server) pipeTrackerEvents(ctx context.Context) {
 
 // launchLyricsResolve resolves lyrics for a track unless a resolution is
 // already in flight for the same track hash. Returns true if launched.
-func (s *Server) launchLyricsResolve(ctx context.Context, track *player.TrackInfo) bool {
+func (s *Server) launchLyricsResolve(ctx context.Context, track *player.TrackInfo, force bool) bool {
 	hash := lyrics.HashKey(track.Artist, track.Title, track.Album)
 	if !s.lyricsInFlight.TryAdd(hash) {
 		log.Printf("Skipping duplicate lyrics resolution for: %s - %s", track.Artist, track.Title)
@@ -269,23 +269,31 @@ func (s *Server) launchLyricsResolve(ctx context.Context, track *player.TrackInf
 	}
 	go func() {
 		defer s.lyricsInFlight.Remove(hash)
-		s.resolveAndPublishLyrics(ctx, track)
+		s.resolveAndPublishLyrics(ctx, track, force)
 	}()
 	return true
 }
 
-func (s *Server) resolveAndPublishLyrics(ctx context.Context, track *player.TrackInfo) {
+func (s *Server) resolveAndPublishLyrics(ctx context.Context, track *player.TrackInfo, force bool) {
 	log.Printf("Resolving lyrics for: %s - %s", track.Artist, track.Title)
 
 	// Notify frontend that lyrics fetch has started
 	loadingPayload, _ := json.Marshal(map[string]string{"type": "lyrics_loading"})
 	s.sse.Publish(loadingPayload)
 
-	data, err := s.lyricsSvc.ResolveSong(ctx, track.Artist, track.Title, track.Album)
+	data, err := s.lyricsSvc.ResolveSong(ctx, track.Artist, track.Title, track.Album, lyrics.ResolveOptions{
+		DurationMs: track.DurationMs,
+		Level:      s.cfg.Lyrics.Level,
+		Force:      force,
+	})
 	if err != nil {
 		log.Printf("Error resolving lyrics (attempt 1): %v — retrying in 1s", err)
 		time.Sleep(1 * time.Second)
-		data, err = s.lyricsSvc.ResolveSong(ctx, track.Artist, track.Title, track.Album)
+		data, err = s.lyricsSvc.ResolveSong(ctx, track.Artist, track.Title, track.Album, lyrics.ResolveOptions{
+			DurationMs: track.DurationMs,
+			Level:      s.cfg.Lyrics.Level,
+			Force:      force,
+		})
 		if err != nil {
 			log.Printf("Error resolving lyrics (attempt 2): %v — giving up", err)
 			errorPayload, _ := json.Marshal(map[string]interface{}{
@@ -301,8 +309,8 @@ func (s *Server) resolveAndPublishLyrics(ctx context.Context, track *player.Trac
 		log.Printf("No lyrics found for: %s - %s", track.Artist, track.Title)
 		// Send empty lyrics event to clear frontend
 		payload, _ := json.Marshal(map[string]interface{}{
-			"type": "lyrics",
-			"lines": []interface{}{},
+			"type":      "lyrics",
+			"lines":     []interface{}{},
 			"not_found": true,
 		})
 		s.sse.Publish(payload)

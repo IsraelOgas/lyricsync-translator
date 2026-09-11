@@ -12,6 +12,7 @@ player:
 lyrics:
   provider: "lrclib"             # "lrclib" or "lrcmux" (aggregator with word-level timestamps + cover art)
   fallback: []                   # Ordered fallback providers tried when the primary fails or finds nothing (e.g. ["lrcmux"])
+  level: "line"               # "line" (default, cached by lrcmux) or "word" (karaoke timestamps)
   lrclib:
     base_url: "https://lrclib.net/api"
     timeout_sec: 15

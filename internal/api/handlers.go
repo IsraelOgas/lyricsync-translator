@@ -108,6 +108,7 @@ func (s *Server) handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		TargetLang         *string `json:"target_lang"`
 		TranslationEnabled *bool   `json:"translation_enabled"`
+		LyricsLevel        *string `json:"lyrics_level"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, `{"error":"invalid json"}`, http.StatusBadRequest)
@@ -131,7 +132,26 @@ func (s *Server) handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 		// duplicate batches from rapid on/off toggling.
 		if *body.TranslationEnabled {
 			if track := s.tracker.GetCurrent(); track != nil {
-				s.launchLyricsResolve(r.Context(), track)
+				s.launchLyricsResolve(r.Context(), track, false)
+			}
+		}
+	}
+
+	if body.LyricsLevel != nil && (*body.LyricsLevel == "line" || *body.LyricsLevel == "word") {
+		if s.cfg.Lyrics.Level != *body.LyricsLevel {
+			s.cfg.Lyrics.Level = *body.LyricsLevel
+			if err := config.Save(s.cfg); err != nil {
+				log.Printf("api: failed to save config: %v", err)
+				http.Error(w, `{"error":"failed to save config"}`, http.StatusInternalServerError)
+				return
+			}
+			// When upgrading to word-level, re-resolve the current track so its
+			// word timestamps arrive immediately. The inflight guard prevents
+			// duplicates. No re-resolution needed when downgrading to line.
+			if *body.LyricsLevel == "word" {
+				if track := s.tracker.GetCurrent(); track != nil {
+					s.launchLyricsResolve(r.Context(), track, true)
+				}
 			}
 		}
 	}
@@ -140,6 +160,7 @@ func (s *Server) handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"target_lang":         s.tranSvc.TargetLang(),
 		"translation_enabled": s.tranSvc.Enabled(),
+		"lyrics_level":        s.cfg.Lyrics.Level,
 	})
 }
 
@@ -178,7 +199,7 @@ func (s *Server) handleRetryLyrics(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error":"no track playing"}`, http.StatusBadRequest)
 		return
 	}
-	go s.resolveAndPublishLyrics(r.Context(), track)
+	go s.resolveAndPublishLyrics(r.Context(), track, false)
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte(`{"ok":true}`))
 }

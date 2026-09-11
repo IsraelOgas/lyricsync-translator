@@ -37,6 +37,7 @@ type PlayerConfig struct {
 type LyricsConfig struct {
 	Provider string       `yaml:"provider" json:"provider"`
 	Fallback []string     `yaml:"fallback" json:"fallback"` // ordered fallback providers, tried after the primary
+	Level    string       `yaml:"level" json:"level"`       // "line" (default) or "word"; word-level karaoke timestamps
 	LRCLib   LRCLibConfig `yaml:"lrclib" json:"lrclib"`
 	LrcMux   LrcMuxConfig `yaml:"lrcmux" json:"lrcmux"`
 }
@@ -95,6 +96,7 @@ func DefaultConfig() *Config {
 		},
 		Lyrics: LyricsConfig{
 			Provider: "lrclib",
+			Level:    "line",
 			LRCLib: LRCLibConfig{
 				BaseURL:    "https://lrclib.net/api",
 				TimeoutSec: 15,
