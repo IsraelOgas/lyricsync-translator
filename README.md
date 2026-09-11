@@ -145,6 +145,7 @@ player:
 lyrics:
   provider: "lrclib"            # "lrclib" o "lrcmux" (agregador con timestamps word-level + cover art)
   fallback: []                  # providers de respaldo en orden (ver abajo)
+  level: "line"                 # "line" (default) o "word" (karaoke palabra por palabra)
   lrclib:
     base_url: "https://lrclib.net/api"
     timeout_sec: 15
@@ -179,6 +180,8 @@ lyrics:
 La API key de DeepSeek se puede configurar desde el panel de **Settings → DeepSeek API Key** sin reiniciar la app. La key se guarda en `~/.config/lyricsync/config.yaml` y se aplica en caliente (hot-reload del cliente).
 
 El toggle **Translate Lyrics** (Settings, o atajo `T`) activa/desactiva toda la tubería de traducción. Cuando está apagado no se hace NINGUNA llamada a DeepSeek/LibreTranslate (costo cero), y al encenderlo se re-resuelve el track actual para arrancar las traducciones que faltan. El estado se persiste en `~/.config/lyricsync/config.yaml` y sobrevive reinicios.
+
+El toggle **Karaoke** (Settings) activa/desactiva el karaoke completo. Cuando está apagado (default) la app pide `level=line`, que lrcmux cachea y no consume rate-limit; al encenderlo pide `level=word` y pinta palabra por palabra si el provider trae timestamps word-level, o cae al fill por línea si no (p. ej. LRCLIB nunca los tiene).
 
 ### Variables de entorno
 
@@ -226,7 +229,7 @@ El toggle **Translate Lyrics** (Settings, o atajo `T`) activa/desactiva toda la 
 | `status` | servidor → cliente | `playing`, `paused`, `stopped`, `no_player` |
 | `position` | servidor → cliente | Posición en ms (cada 500ms) |
 | `lyrics_loading` | servidor → cliente | Búsqueda de letras iniciada |
-| `lyrics` | servidor → cliente | Letras + flag `translating` + `not_found`; `song.source` (badge de origen) y `cover_art` si el provider los trae |
+| `lyrics` | servidor → cliente | Letras + flag `translating` + `not_found`; `song.source` (badge de origen), `cover_art`, `isrc` y `end_ms` por línea se incluyen cuando el provider los trae |
 | `lyrics_error` | servidor → cliente | Error al cargar letras o traducir (`error`, `retry`) |
 | `translations` | servidor → cliente | Traducciones completadas (merge con líneas existentes) |
 
@@ -270,9 +273,11 @@ lyricsync-translator/
 - Detección automática de **cualquier reproductor MPRIS** (Spotify, Brave, Chrome, apps)
 - Letras sincronizadas (LRC) con highlight en tiempo real + click-to-seek
 - **Doble fuente de letras**: LRCLib y **lrcmux** (agregador multi-origen), con **fallback en cadena** configurable
-- **Karaoke palabra por palabra**: cuando el provider trae timestamps word-level (lrcmux), el karaoke pinta cada palabra con su propio progreso; si no, cae al fill por línea
+- **Karaoke unificado**: un solo toggle en Settings (default OFF) que pide timestamps word-level a lrcmux y pinta palabra por palabra cuando están disponibles; si no, cae al fill por línea. Apagado = pide line-level (cacheado, sin gastar rate-limit)
+- **Nivel de sync visible**: el badge de fuente muestra el nivel real servido (\`· word\` / \`· line\` / \`· none\`) y avisa con \`word N/D\` cuando Word Karaoke está activo pero el provider no trajo timestamps por palabra (p. ej. LRCLIB nunca los tiene)
 - **Badge de origen de letras**: muestra de qué provider salieron (ej. `lrcmux · Kugou`) en la barra Now Playing, el viewer y cinema mode
 - **Cover art desde lrcmux**: portadas de Deezer CDN cacheadas en SQLite y servidas con la canción
+- **ISRC + duración reales**: lrcmux devuelve el ISRC del track y la duración canónica; se cachean y se reutilizan en re-fetch (matching por ISRC tiene prioridad)
 - **Toggle de traducción con costo cero**: apagado = ninguna llamada a DeepSeek/LibreTranslate; atajo `T`
 - **Dedupe en vuelo**: evita resoluciones duplicadas cuando playerctl emite múltiples track events
 - Traducción EN→ES (LibreTranslate o DeepSeek) con romanización de japonés, chino y coreano
