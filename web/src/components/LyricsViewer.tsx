@@ -14,17 +14,26 @@ interface Props {
   lyricsError?: string | null;
   onRetry?: () => void;
   showRomanization?: boolean;
-  karaokeMode?: boolean;
+  karaoke?: boolean;
   /** When true, suppresses position sync and click-to-seek for static display. */
   staticMode?: boolean;
 }
 
+/** Per-word state for karaoke rendering. */
+interface WordState {
+  text: string;
+  progress: number; // 0..1 for current word, -1 pending, 1 done
+}
 
-export const LyricsViewer: React.FC<Props> = ({ lines, positionMs, offsetMs, paused, notFound, fetchingLyrics, translating, lyricsError, onRetry, showRomanization = true, karaokeMode = true, staticMode = false }) => {
+export const LyricsViewer: React.FC<Props> = ({ lines, positionMs, offsetMs, paused, notFound, fetchingLyrics, translating, lyricsError, onRetry, showRomanization = true, karaoke = true, staticMode = false }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [activeIdx, setActiveIdx] = useState(-1);
   const [toastVisible, setToastVisible] = useState(false);
   const toastTimer = useRef<number>(0);
+  // Word-level karaoke states for the active line.
+  const [wordStates, setWordStates] = useState<WordState[]>([]);
+  // Legacy line-level progress fallback.
+  const [karaokeProgress, setKaraokeProgress] = useState(0);
 
   // Show toast when error arrives, auto-dismiss after 6s.
   useEffect(() => {
@@ -41,9 +50,6 @@ export const LyricsViewer: React.FC<Props> = ({ lines, positionMs, offsetMs, pau
   // Apply offset to effective position
   const effectiveMs = positionMs + offsetMs;
 
-  // Karaoke progress: how far we are through the current active line (0..1)
-  const [karaokeProgress, setKaraokeProgress] = useState(0);
-
   useEffect(() => {
     if (staticMode || lines.length === 0 || paused) return;
 
@@ -54,9 +60,7 @@ export const LyricsViewer: React.FC<Props> = ({ lines, positionMs, offsetMs, pau
 
     if (syncedLines.length === 0) return;
 
-    // If every timestamp is 0, the lyrics are unsynced (plain text) —
-    // either from a fresh fetch (nil → omitted) or stale cache (0 stored as non-nil).
-    // Skip binary search to avoid sticking to the last line.
+    // If every timestamp is 0, the lyrics are unsynced (plain text).
     if (syncedLines.every((l) => l.time_ms === 0)) return;
 
     let lo = 0;
@@ -75,17 +79,34 @@ export const LyricsViewer: React.FC<Props> = ({ lines, positionMs, offsetMs, pau
 
     setActiveIdx(syncedLines[best].origIdx);
 
-    // Calculate karaoke progress within the active line (only when fill effect is on)
-    if (karaokeMode) {
-      const activeLine = syncedLines[best];
+    const activeLine = syncedLines[best];
+
+    // Word-level karaoke: paint each word with its own progress.
+    if (karaoke && activeLine.words && activeLine.words.length > 0) {
+      const states: WordState[] = activeLine.words.map((w) => {
+        const duration = Math.max(w.end_ms - w.start_ms, 1);
+        const raw = (effectiveMs - w.start_ms) / duration;
+        if (raw <= 0) return { text: w.text, progress: -1 };   // pending
+        if (raw >= 1) return { text: w.text, progress: 1 };     // done
+        return { text: w.text, progress: Math.min(1, Math.max(0, raw)) }; // active
+      });
+      setWordStates(states);
+      setKaraokeProgress(0); // not used in word mode
+    } else if (karaoke) {
+      // Line-level fill: only when the Karaoke toggle is ON and no word data.
       const nextLine = syncedLines.find((l, i) => i > best && l.time_ms != null);
       const lineStart = activeLine.time_ms ?? 0;
-      const lineEnd = nextLine?.time_ms ?? (lineStart + 4000); // fallback ~4s
+      const lineEnd = activeLine.end_ms ?? nextLine?.time_ms ?? (lineStart + 4000);
       const duration = Math.max(lineEnd - lineStart, 1);
       const progress = Math.min(1, Math.max(0, (effectiveMs - lineStart) / duration));
       setKaraokeProgress(progress);
+      setWordStates([]);
+    } else {
+      // Neither word karaoke nor line fill: clear any stale paint state.
+      setWordStates([]);
+      setKaraokeProgress(0);
     }
-  }, [effectiveMs, lines, paused, karaokeMode]);
+  }, [effectiveMs, lines, paused, karaoke]);
 
   useEffect(() => {
     if (staticMode || paused) return;
@@ -141,6 +162,45 @@ export const LyricsViewer: React.FC<Props> = ({ lines, positionMs, offsetMs, pau
   };
 
   const hasRomanization = lines.some(l => l.romanized);
+  const hasWordKaraoke = wordStates.length > 0;
+
+  /** Render original text: word spans if word-level data exists, plain text otherwise. */
+  const renderOriginal = (line: LyricLineData, isActive: boolean) => {
+    // Word-level karaoke on active line.
+    if (isActive && hasWordKaraoke) {
+      return (
+        <p className={styles.original}>
+          {wordStates.map((ws, wi) => (
+            <span
+              key={wi}
+              className={
+                ws.progress >= 1 ? styles.wordDone :
+                ws.progress < 0 ? styles.wordPending :
+                styles.wordActive
+              }
+              style={ws.progress > 0 && ws.progress < 1 ? { '--word-progress': ws.progress } as React.CSSProperties : undefined}
+            >
+              {ws.text}
+            </span>
+          ))}
+        </p>
+      );
+    }
+
+    // Word-level on inactive lines: render spans but no progress classes.
+    if (karaoke && line.words && line.words.length > 0) {
+      return (
+        <p className={styles.original}>
+          {line.words.map((w, wi) => (
+            <span key={wi}>{w.text}</span>
+          ))}
+        </p>
+      );
+    }
+
+    // Plain text fallback.
+    return <p className={styles.original}>{line.original}</p>;
+  };
 
   return (
     <div ref={containerRef} className={`${styles.container} ${paused ? styles.containerPaused : ''}`} data-has-romanization={hasRomanization ? 'true' : 'false'}>
@@ -165,16 +225,14 @@ export const LyricsViewer: React.FC<Props> = ({ lines, positionMs, offsetMs, pau
             key={line.id || idx}
             data-active={isActive}
             className={`${styles.line} ${isActive ? styles.lineActive : styles.lineInactive} ${isClickable ? styles.clickable : ''}`}
-            style={isActive && karaokeMode ? { '--karaoke-progress': karaokeProgress } as React.CSSProperties : undefined}
+            style={isActive && karaoke && !hasWordKaraoke ? { '--karaoke-progress': karaokeProgress } as React.CSSProperties : undefined}
             onClick={isClickable ? () => handleLineClick(line.time_ms!) : undefined}
             title={isClickable ? (isInstrumental ? 'Instrumental' : 'Click to jump to this verse') : undefined}
           >
             {isInstrumental ? (
               <p className={styles.instrumental}>— ♪ —</p>
             ) : (
-              <p className={styles.original}>
-                {line.original}
-              </p>
+              renderOriginal(line, isActive)
             )}
             {!isInstrumental && showRomanization !== false && line.romanized && (
               <p className={styles.romanized}>{line.romanized}</p>

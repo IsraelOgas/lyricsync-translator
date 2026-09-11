@@ -17,9 +17,17 @@ export interface TrackerEvent {
 export interface LyricLineData {
   id: number;
   time_ms: number | null;
+  end_ms?: number;
   original: string;
   romanized?: string;
   translated?: string;
+  words?: LyricWord[];
+}
+
+export interface LyricWord {
+  text: string;
+  start_ms: number;
+  end_ms: number;
 }
 
 export interface SongInfo {
@@ -31,6 +39,13 @@ export interface SongInfo {
   duration_ms?: number;
   offset_ms: number;
   source: string;
+  isrc?: string;
+  sync_level?: string; // "word" | "line" | "none" — actual sync level served
+  cover_art?: {
+    small: string;
+    medium: string;
+    big: string;
+  };
 }
 
 export interface LyricsLoadingEvent {
@@ -63,6 +78,7 @@ export interface Settings {
   cinemaMode: boolean;
   textAlignment: 'left' | 'center' | 'right';
   karaokeMode: boolean;
+  translationEnabled: boolean;
 }
 
 /** Subset of stored song for list endpoints — no lyric data. */
@@ -86,8 +102,21 @@ export const DEFAULT_SETTINGS: Settings = {
   targetLang: 'es',
   cinemaMode: false,
   textAlignment: 'center',
-  karaokeMode: true,
+  karaokeMode: false,
+  translationEnabled: true,
 };
+
+/** Human-readable lyrics source for the UI badge. */
+export function formatSource(source: string): string {
+  if (!source) return '';
+  const [provider, origin] = source.split('/');
+  const name = provider === 'lrclib' ? 'LRCLIB' : provider;
+  if (origin) {
+    const originLabel = origin === 'lrclib' ? 'LRCLIB' : origin.charAt(0).toUpperCase() + origin.slice(1);
+    return `${name} · ${originLabel}`;
+  }
+  return name;
+}
 
 // Global declarations for the Wails desktop environment.
 declare global {

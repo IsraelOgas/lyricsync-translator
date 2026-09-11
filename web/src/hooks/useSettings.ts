@@ -46,6 +46,7 @@ function loadFromStorage(): Settings {
       cinemaMode: typeof parsed.cinemaMode === 'boolean' ? parsed.cinemaMode : DEFAULT_SETTINGS.cinemaMode,
       textAlignment: ['left', 'center', 'right'].includes(parsed.textAlignment) ? parsed.textAlignment : DEFAULT_SETTINGS.textAlignment,
       karaokeMode: typeof parsed.karaokeMode === 'boolean' ? parsed.karaokeMode : DEFAULT_SETTINGS.karaokeMode,
+      translationEnabled: typeof parsed.translationEnabled === 'boolean' ? parsed.translationEnabled : DEFAULT_SETTINGS.translationEnabled,
     };
   } catch {
     return DEFAULT_SETTINGS;
@@ -102,6 +103,47 @@ export function useSettings(): UseSettingsReturn {
     applySettings(settings);
   }, [settings]);
 
+  // Sync backend-persisted settings (translation toggle + target language) from
+  // the server on mount. These two live in config.yaml on the backend, so the
+  // checkbox and language selector must reflect the real state — not just what
+  // localStorage remembers from a previous session.
+  useEffect(() => {
+    let cancelled = false;
+    fetch(apiUrl('/api/config'))
+      .then(res => res.json())
+      .then(data => {
+        if (cancelled) return;
+        setSettings(prev => {
+          const next = { ...prev };
+          let changed = false;
+          const enabled = data?.translation?.enabled;
+          if (typeof enabled === 'boolean' && enabled !== prev.translationEnabled) {
+            next.translationEnabled = enabled;
+            changed = true;
+          }
+          const lang = data?.translation?.target_lang;
+          if (typeof lang === 'string' && lang !== prev.targetLang) {
+            next.targetLang = lang;
+            changed = true;
+          }
+          const wl = data?.lyrics?.level;
+          if (typeof wl === 'string' && (wl === 'word') !== prev.karaokeMode) {
+            next.karaokeMode = wl === 'word';
+            changed = true;
+          }
+          if (changed) {
+            saveToStorage(next);
+            return next;
+          }
+          return prev;
+        });
+      })
+      .catch(() => {
+        // Backend unreachable — keep local state.
+      });
+    return () => { cancelled = true; };
+  }, []);
+
   const updateSetting = useCallback(<K extends keyof Settings>(key: K, value: Settings[K]) => {
     setSettings(prev => {
       const next = { ...prev, [key]: value };
@@ -114,6 +156,25 @@ export function useSettings(): UseSettingsReturn {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ target_lang: value }),
         }).catch(() => {}); // non-blocking — backend will use default if unreachable
+      }
+
+      // Sync translation on/off to backend
+      if (key === 'translationEnabled') {
+        fetch(apiUrl('/api/config'), {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ translation_enabled: value }),
+        }).catch(() => {}); // non-blocking — backend keeps its current state if unreachable
+      }
+
+      // Sync karaoke on/off to backend: ON requests word-level (rate-limited),
+      // OFF requests line-level (cached by lrcmux, free).
+      if (key === 'karaokeMode') {
+        fetch(apiUrl('/api/config'), {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lyrics_level: value ? 'word' : 'line' }),
+        }).catch(() => {}); // non-blocking — backend keeps its current state if unreachable
       }
 
       return next;

@@ -21,6 +21,7 @@ const SHORTCUTS: ShortcutEntry[] = [
   { key: 'S', action: 'Toggle shuffle' },
   { key: 'L', action: 'Cycle loop' },
   { key: 'R', action: 'Toggle romanization' },
+  { key: 'T', action: 'Toggle translation' },
   { key: 'C', action: 'Toggle cinema mode' },
   { key: 'Esc', action: 'Close this dialog' },
 ];

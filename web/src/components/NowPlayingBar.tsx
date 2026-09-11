@@ -1,6 +1,7 @@
 import React from 'react';
 import { Music, Library } from 'lucide-react';
 import type { TrackInfo } from '../types';
+import { formatSource } from '../types';
 import styles from './NowPlayingBar.module.css';
 
 interface Props {
@@ -8,9 +9,12 @@ interface Props {
   status: string;
   view: 'now-playing' | 'saved-songs';
   onViewChange: (view: 'now-playing' | 'saved-songs') => void;
+  source?: string | null;
+  syncLevel?: string | null;
+  wordUnavailable?: boolean;
 }
 
-export const NowPlayingBar: React.FC<Props> = ({ track, status, view, onViewChange }) => {
+export const NowPlayingBar: React.FC<Props> = ({ track, status, view, onViewChange, source, syncLevel, wordUnavailable }) => {
   const tabs = (
     <div className={styles.viewTabs}>
       <button
@@ -64,6 +68,8 @@ export const NowPlayingBar: React.FC<Props> = ({ track, status, view, onViewChan
         <span className={styles.title} title={track.title}>{track.title}</span>
         <span className={styles.artist} title={track.artist}>{track.artist}</span>
         {track.album && <span className={styles.album}>{track.album}</span>}
+        {source && <span className={styles.sourceBadge}>{formatSource(source)}{syncLevel ? ` | ${syncLevel}` : ''}</span>}
+        {wordUnavailable && <span className={styles.wordNdBadge} title="Word karaoke not available for this track (provider returned line/none)">word N/D</span>}
       </div>
       {tabs}
       <span className={styles.status}>{status}</span>

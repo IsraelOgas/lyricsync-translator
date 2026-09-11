@@ -11,6 +11,7 @@ import (
 type Service struct {
 	translator Translator
 	targetLang string
+	enabled    bool
 	mu         sync.RWMutex
 }
 
@@ -19,7 +20,23 @@ func NewService(translator Translator, targetLang string) *Service {
 	if targetLang == "" {
 		targetLang = "es"
 	}
-	return &Service{translator: translator, targetLang: targetLang}
+	return &Service{translator: translator, targetLang: targetLang, enabled: true}
+}
+
+// SetEnabled toggles the whole translation pipeline on/off.
+// When disabled, no provider calls are made (no API cost).
+func (s *Service) SetEnabled(enabled bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.enabled = enabled
+	log.Printf("translate: enabled set to %v", enabled)
+}
+
+// Enabled reports whether translation is currently enabled.
+func (s *Service) Enabled() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.enabled
 }
 
 // SetTargetLang updates the target language for subsequent translations.
