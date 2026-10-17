@@ -33,6 +33,7 @@ type Server struct {
 	httpSrv                 *http.Server
 	cancel                  context.CancelFunc
 	lyricsInFlight          *inflightSet
+	payloadMu               sync.RWMutex // guards the last*Payload snapshots
 	lastTrackPayload        []byte
 	lastLyricsPayload       []byte
 	lastTranslationsPayload []byte
@@ -104,7 +105,7 @@ func NewServer(
 		payload, _ := json.Marshal(updateEvent{Type: "translations", Lines: ld})
 		log.Printf("OnUpdate: publishing translations event (%d bytes)", len(payload))
 		s.sse.Publish(payload)
-		s.lastTranslationsPayload = payload
+		s.rememberTranslations(payload)
 	}
 
 	// Register error callback: emits a lyrics_error event so the frontend
@@ -214,6 +215,50 @@ func (s *Server) spaHandler(assetsFS fs.FS, apiBase string) http.HandlerFunc {
 	}
 }
 
+// shutdownDrainTimeout bounds how long Shutdown waits for in-flight HTTP
+// requests before forcing their connections closed.
+const shutdownDrainTimeout = 5 * time.Second
+
+// payloadSnapshot holds the most recent SSE events so a newly connected client
+// can be primed with current state instead of starting empty.
+type payloadSnapshot struct {
+	track        []byte
+	lyrics       []byte
+	translations []byte
+}
+
+// Remember* store the latest event of each kind. They are written from tracker
+// and translation goroutines and read by streaming handlers, so the snapshot
+// fields are only touched through these helpers and lastPayloads.
+func (s *Server) rememberTrack(p []byte) {
+	s.payloadMu.Lock()
+	defer s.payloadMu.Unlock()
+	s.lastTrackPayload = p
+}
+
+func (s *Server) rememberLyrics(p []byte) {
+	s.payloadMu.Lock()
+	defer s.payloadMu.Unlock()
+	s.lastLyricsPayload = p
+}
+
+func (s *Server) rememberTranslations(p []byte) {
+	s.payloadMu.Lock()
+	defer s.payloadMu.Unlock()
+	s.lastTranslationsPayload = p
+}
+
+// lastPayloads returns a consistent copy of the current payload snapshot.
+func (s *Server) lastPayloads() payloadSnapshot {
+	s.payloadMu.RLock()
+	defer s.payloadMu.RUnlock()
+	return payloadSnapshot{
+		track:        s.lastTrackPayload,
+		lyrics:       s.lastLyricsPayload,
+		translations: s.lastTranslationsPayload,
+	}
+}
+
 func (s *Server) Start(ctx context.Context) {
 	s.httpSrv = &http.Server{
 		Addr:    s.cfg.Server.Address(),
@@ -237,8 +282,26 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	if s.cancel != nil {
 		s.cancel()
 	}
-	if s.httpSrv != nil {
-		return s.httpSrv.Shutdown(ctx)
+
+	// Release SSE handlers first. They block on their client channel, and the
+	// HTTP drain below cannot finish while a stream is still open — which is
+	// what used to freeze the window when the user clicked the close button.
+	s.sse.Stop()
+
+	if s.httpSrv == nil {
+		return nil
+	}
+
+	// Bound the drain with wall-clock time. The Wails shutdown context is not
+	// cancellable, so an unbounded Shutdown would hang forever if any request
+	// (lyrics fetch, translation retry) is still in flight.
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownDrainTimeout)
+	defer cancel()
+
+	if err := s.httpSrv.Shutdown(shutdownCtx); err != nil {
+		// Something is still holding a connection: drop it and report.
+		s.httpSrv.Close()
+		return err
 	}
 	return nil
 }
@@ -257,7 +320,7 @@ func (s *Server) pipeTrackerEvents(ctx context.Context) {
 
 			var evt player.TrackerEvent
 			if err := json.Unmarshal(event, &evt); err == nil && evt.Type == "track" && evt.Track != nil {
-				s.lastTrackPayload = event
+				s.rememberTrack(event)
 				s.launchLyricsResolve(ctx, evt.Track, false)
 			}
 		}
@@ -328,7 +391,7 @@ func (s *Server) resolveAndPublishLyrics(ctx context.Context, track *player.Trac
 		return
 	}
 	s.sse.Publish(payload)
-	s.lastLyricsPayload = payload
+	s.rememberLyrics(payload)
 	log.Printf("Lyrics published for: %s - %s (%d lines)", track.Artist, track.Title, len(data.Lines))
 }
 

@@ -161,8 +161,13 @@ func main() {
 		},
 		OnShutdown: func(ctx context.Context) {
 			fmt.Println("\nShutting down...")
-			srv.Shutdown(ctx)
-			store.Close()
+			if err := srv.Shutdown(ctx); err != nil {
+				log.Printf("Server shutdown: %v", err)
+			}
+			if err := store.Close(); err != nil {
+				log.Printf("Closing database: %v", err)
+			}
+			fmt.Println("Shutdown complete")
 		},
 		OnBeforeClose: func(ctx context.Context) bool {
 			x, y := runtime.WindowGetPosition(ctx)
