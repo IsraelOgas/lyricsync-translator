@@ -53,9 +53,13 @@ func (s PlayerStatus) String() string {
 // playerctl and closes the three channels, so shutting the app down never
 // leaves an orphan `playerctl --follow` behind.
 //
+// onActivePlayer (optional) is called whenever the tracked MPRIS player
+// changes. It is a callback rather than a shared pointer so the caller can
+// keep that state under its own lock.
+//
 // Returns an error if playerctl cannot be started (likely not installed).
 // The caller should receive StatusNoPlayer on the status channel in that case.
-func Start(ctx context.Context, playerctlPath string, activePlayer *string) (<-chan TrackInfo, <-chan PlayerStatus, <-chan int64, error) {
+func Start(ctx context.Context, playerctlPath string, onActivePlayer func(string)) (<-chan TrackInfo, <-chan PlayerStatus, <-chan int64, error) {
 	format := "{{artist}}||{{title}}||{{album}}||{{mpris:length}}||{{position}}||{{status}}||{{playerName}}||{{mpris:artUrl}}"
 
 	cmd := exec.CommandContext(ctx, playerctlPath, "--follow", "-a", "--format", format, "metadata", "position", "status")
@@ -107,9 +111,14 @@ func Start(ctx context.Context, playerctlPath string, activePlayer *string) (<-c
 		defer close(posCh)
 
 		var localActive string // track which player we're following
-		if activePlayer != nil {
-			*activePlayer = localActive
+
+		// Notify the owner of the tracked player, if it asked to be notified.
+		notifyActive := func(name string) {
+			if onActivePlayer != nil {
+				onActivePlayer(name)
+			}
 		}
+		notifyActive(localActive)
 
 		scanner := bufio.NewScanner(stdout)
 		for scanner.Scan() {
@@ -154,26 +163,20 @@ func Start(ctx context.Context, playerctlPath string, activePlayer *string) (<-c
 			if status == StatusPlaying && playerName != "" {
 				if localActive != playerName {
 					localActive = playerName
-					if activePlayer != nil {
-						*activePlayer = localActive
-					}
+					notifyActive(localActive)
 				}
 			}
 
 			// If active player stopped, clear it so we can pick up another.
 			if playerName == localActive && status == StatusStopped {
 				localActive = ""
-				if activePlayer != nil {
-					*activePlayer = ""
-				}
+				notifyActive(localActive)
 			}
 
 			// Adopt first player with content if nothing is active yet.
 			if localActive == "" && artist != "" && title != "" {
 				localActive = playerName
-				if activePlayer != nil {
-					*activePlayer = localActive
-				}
+				notifyActive(localActive)
 			}
 
 			// Ignore events from players we are not tracking.

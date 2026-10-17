@@ -70,8 +70,7 @@ func TestStart_KillsChildOnContextCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	var active string
-	if _, _, _, err := Start(ctx, scriptPath, &active); err != nil {
+	if _, _, _, err := Start(ctx, scriptPath, nil); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
 
@@ -145,8 +144,7 @@ func TestStart_MissingPlayerctlStillReturnsNoPlayerError(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	var active string
-	_, _, _, err := Start(ctx, filepath.Join(t.TempDir(), "does-not-exist"), &active)
+	_, _, _, err := Start(ctx, filepath.Join(t.TempDir(), "does-not-exist"), nil)
 	if err == nil {
 		t.Fatal("Start with a missing playerctl binary returned no error")
 	}
@@ -175,5 +173,45 @@ func TestTrackerEvents_KillsChildOnContextCancel(t *testing.T) {
 			t.Fatalf("playerctl follower (pid %d) still alive after the tracker context was cancelled", pid)
 		}
 		time.Sleep(20 * time.Millisecond)
+	}
+}
+
+// TestStart_ReportsActivePlayer pins that the tracked player is reported through
+// the callback, which keeps that state under the owner's lock instead of a
+// shared pointer written by two goroutines.
+func TestStart_ReportsActivePlayer(t *testing.T) {
+	dir := t.TempDir()
+	scriptPath := filepath.Join(dir, "fake-playerctl")
+
+	// One follower line: a playing player called "harness".
+	script := `#!/bin/sh
+case "$*" in
+  *--follow*) printf '%s\n' 'Artist||Title||Album||180000000||1000000||Playing||harness||file://cover.jpg'; sleep 0.2 ;;
+esac
+exit 0
+`
+	if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("writing fake playerctl: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	reported := make(chan string, 8)
+	_, _, _, err := Start(ctx, scriptPath, func(name string) { reported <- name })
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+
+	deadline := time.After(5 * time.Second)
+	for {
+		select {
+		case name := <-reported:
+			if name == "harness" {
+				return
+			}
+		case <-deadline:
+			t.Fatal("Start never reported the active player \"harness\" through its callback")
+		}
 	}
 }
