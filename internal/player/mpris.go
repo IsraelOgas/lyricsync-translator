@@ -2,6 +2,7 @@ package player
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os/exec"
 	"strconv"
@@ -48,12 +49,20 @@ func (s PlayerStatus) String() string {
 // The format string uses pipe as separator: artist||title||album||duration||position||status||playerName
 // Position is updated roughly every 500ms by polling.
 //
+// The child process lives until ctx is cancelled: cancelling ctx kills
+// playerctl and closes the three channels, so shutting the app down never
+// leaves an orphan `playerctl --follow` behind.
+//
+// onActivePlayer (optional) is called whenever the tracked MPRIS player
+// changes. It is a callback rather than a shared pointer so the caller can
+// keep that state under its own lock.
+//
 // Returns an error if playerctl cannot be started (likely not installed).
 // The caller should receive StatusNoPlayer on the status channel in that case.
-func Start(playerctlPath string, activePlayer *string) (<-chan TrackInfo, <-chan PlayerStatus, <-chan int64, error) {
+func Start(ctx context.Context, playerctlPath string, onActivePlayer func(string)) (<-chan TrackInfo, <-chan PlayerStatus, <-chan int64, error) {
 	format := "{{artist}}||{{title}}||{{album}}||{{mpris:length}}||{{position}}||{{status}}||{{playerName}}||{{mpris:artUrl}}"
 
-	cmd := exec.Command(playerctlPath, "--follow", "-a", "--format", format, "metadata", "position", "status")
+	cmd := exec.CommandContext(ctx, playerctlPath, "--follow", "-a", "--format", format, "metadata", "position", "status")
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -68,6 +77,33 @@ func Start(playerctlPath string, activePlayer *string) (<-chan TrackInfo, <-chan
 	statusCh := make(chan PlayerStatus, 8)
 	posCh := make(chan int64, 64)
 
+	// The sends below stop on cancellation: Tracker.Events returns on ctx.Done
+	// and stops draining, so an unguarded send would block this goroutine and
+	// keep the reader alive after shutdown.
+	sendTrack := func(t TrackInfo) bool {
+		select {
+		case trackCh <- t:
+			return true
+		case <-ctx.Done():
+			return false
+		}
+	}
+	sendStatus := func(s PlayerStatus) bool {
+		select {
+		case statusCh <- s:
+			return true
+		case <-ctx.Done():
+			return false
+		}
+	}
+	sendPosition := func(ms int64) bool {
+		select {
+		case posCh <- ms:
+			return true
+		case <-ctx.Done():
+			return false
+		}
+	}
 	go func() {
 		defer cmd.Wait()
 		defer close(trackCh)
@@ -75,12 +111,20 @@ func Start(playerctlPath string, activePlayer *string) (<-chan TrackInfo, <-chan
 		defer close(posCh)
 
 		var localActive string // track which player we're following
-		if activePlayer != nil {
-			*activePlayer = localActive
+
+		// Notify the owner of the tracked player, if it asked to be notified.
+		notifyActive := func(name string) {
+			if onActivePlayer != nil {
+				onActivePlayer(name)
+			}
 		}
+		notifyActive(localActive)
 
 		scanner := bufio.NewScanner(stdout)
 		for scanner.Scan() {
+			if ctx.Err() != nil {
+				return
+			}
 			line := scanner.Text()
 			parts := strings.Split(line, "||")
 			if len(parts) < 8 {
@@ -119,26 +163,20 @@ func Start(playerctlPath string, activePlayer *string) (<-chan TrackInfo, <-chan
 			if status == StatusPlaying && playerName != "" {
 				if localActive != playerName {
 					localActive = playerName
-					if activePlayer != nil {
-						*activePlayer = localActive
-					}
+					notifyActive(localActive)
 				}
 			}
 
 			// If active player stopped, clear it so we can pick up another.
 			if playerName == localActive && status == StatusStopped {
 				localActive = ""
-				if activePlayer != nil {
-					*activePlayer = ""
-				}
+				notifyActive(localActive)
 			}
 
 			// Adopt first player with content if nothing is active yet.
 			if localActive == "" && artist != "" && title != "" {
 				localActive = playerName
-				if activePlayer != nil {
-					*activePlayer = localActive
-				}
+				notifyActive(localActive)
 			}
 
 			// Ignore events from players we are not tracking.
@@ -150,7 +188,9 @@ func Start(playerctlPath string, activePlayer *string) (<-chan TrackInfo, <-chan
 			if artist == "" && title == "" {
 				if posStr != "" {
 					if pos, err := strconv.Atoi(posStr); err == nil {
-						posCh <- int64(pos) / 1000
+						if !sendPosition(int64(pos) / 1000) {
+							return
+						}
 					}
 				}
 				continue
@@ -158,30 +198,40 @@ func Start(playerctlPath string, activePlayer *string) (<-chan TrackInfo, <-chan
 
 			// Track info
 			if artist != "" && title != "" {
-				trackCh <- TrackInfo{
+				if !sendTrack(TrackInfo{
 					Artist:      artist,
 					Title:       title,
 					Album:       album,
 					CoverArtURL: artUrl,
 					DurationMs:  durationMs,
+				}) {
+					return
 				}
 			}
 
 			// Position
 			if posStr != "" {
 				if pos, err := strconv.Atoi(posStr); err == nil {
-					posCh <- int64(pos) / 1000
+					if !sendPosition(int64(pos) / 1000) {
+						return
+					}
 				}
 			}
 
 			// Status
 			switch status {
 			case StatusPlaying:
-				statusCh <- StatusPlaying
+				if !sendStatus(StatusPlaying) {
+					return
+				}
 			case StatusPaused:
-				statusCh <- StatusPaused
+				if !sendStatus(StatusPaused) {
+					return
+				}
 			case StatusStopped:
-				statusCh <- StatusStopped
+				if !sendStatus(StatusStopped) {
+					return
+				}
 			}
 		}
 	}()

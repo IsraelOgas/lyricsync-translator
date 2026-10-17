@@ -83,6 +83,16 @@ function applySettings(settings: Settings): void {
   } else {
     window.runtime?.WindowUnfullscreen();
   }
+
+  // Report the resulting native fullscreen state to the backend so the Go close
+  // handler can read a cached value instead of querying GTK off the main thread.
+  // Fire-and-forget: no Wails guard (relative path works in a plain browser) and
+  // failures are silently ignored.
+  fetch(apiUrl('/api/window/fullscreen'), {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fullscreen: settings.cinemaMode }),
+  }).catch(() => {});
 }
 
 export interface UseSettingsReturn {
