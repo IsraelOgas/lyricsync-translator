@@ -8,11 +8,12 @@ Ahora como **app de escritorio nativa** con Wails v2 — un solo binario, sin ab
 
 | Dependencia | Paquete | Obligatorio | Notas |
 |---|---|---|---|
-| Go | `snap install go --classic` | ✅ | 1.26+ |
+| Go | `snap install go --classic` | ✅ | 1.26+ (probado con 1.27.2) |
 | Node.js + pnpm | `nodejs`, `pnpm` | ✅ | 22+ |
 | `playerctl` | `sudo apt install playerctl` | ✅ | Detección MPRIS |
 | GTK 3 dev | `sudo apt install libgtk-3-dev` | ✅ | Wails — UI nativa |
 | WebKit2 GTK dev | `sudo apt install libwebkit2gtk-4.1-dev` | ✅ | Wails — motor web |
+| Wails CLI | `go install github.com/wailsapp/wails/v2/cmd/wails@v2.16.0` | ✅ | v2.12 no compila con Go 1.27 (ver Problemas frecuentes) |
 | LibreTranslate | Docker `libretranslate/libretranslate` | ⬜ | Solo si usás `libretranslate` como provider |
 
 ### Instalación rápida de dependencias (Ubuntu/Debian)
@@ -21,6 +22,55 @@ Ahora como **app de escritorio nativa** con Wails v2 — un solo binario, sin ab
 sudo apt install -y playerctl libgtk-3-dev libwebkit2gtk-4.1-dev
 snap install go --classic
 ```
+
+### Instalación desde cero (paso a paso)
+
+1. Dependencias del sistema (apt):
+
+   ```bash
+   sudo apt install -y playerctl libgtk-3-dev libwebkit2gtk-4.1-dev
+   ```
+
+2. Go (el proyecto usa `go 1.26.3` en `go.mod`; si ya tenés Go de tu distro, salta este paso):
+
+   ```bash
+   snap install go --classic
+   ```
+
+3. PATH de binarios de Go:
+
+   ```bash
+   export PATH="$HOME/go/bin:$PATH"
+   ```
+
+4. Instalar la CLI de Wails:
+
+   ```bash
+   go install github.com/wailsapp/wails/v2/cmd/wails@v2.16.0
+   ```
+
+5. Verificar el entorno (opcional pero recomendado):
+
+   ```bash
+   wails doctor
+   ```
+
+   Muestra versión de Wails, Go, OS, GPU y si encuentra los paquetes de GTK/WebKit.
+
+6. Compilar:
+
+   ```bash
+   mkdir -p ~/tmp/wails
+   TMPDIR=~/tmp/wails wails build
+   ```
+
+7. Ejecutar:
+
+   ```bash
+   ./bin/lyricsync
+   ```
+
+Ojo: tener instalada solo la librería runtime de GTK/WebKit (`libgtk-3-0`, `libwebkit2gtk-4.1-0`) permite ejecutar un binario ya compilado, pero no compilar: para `wails build` hacen falta los paquetes `-dev`.
 
 ## Build — App de escritorio (Wails)
 
@@ -54,6 +104,35 @@ Si tu distro usa `webkit2gtk-4.0` (Ubuntu 22.04, Debian 12), cambiá el tag a `w
 | `webkit2gtk-4.0 was not found` | Ubuntu 24.04 usa 4.1, no 4.0 | Agregá `build:tags: webkit2_41` en `wails.json` |
 | `libwebkit2gtk-4.1-dev` no encontrado | Falta el paquete dev | `sudo apt install libwebkit2gtk-4.1-dev` |
 | `fatal error: gtk/gtk.h: No such file` | Falta GTK dev | `sudo apt install libgtk-3-dev` |
+| `internal error: package "fmt" without types was imported from ...` | CLI de Wails ≤ v2.12 usa `golang.org/x/tools` viejo y no puede leer los datos de exportación de Go 1.27; `-skipbindings` no lo evita | `go install github.com/wailsapp/wails/v2/cmd/wails@v2.16.0` |
+| `Package 'gtk+-3.0' not found` / `Package 'webkit2gtk-4.1' not found` durante la compilación CGO | Faltan los headers de desarrollo (la librería runtime no alcanza) | `sudo apt install libgtk-3-dev libwebkit2gtk-4.1-dev` |
+
+### Verificar el build
+
+Binario enlazado contra las libs correctas:
+
+```bash
+ldd bin/lyricsync | grep -E 'webkit2gtk|gtk-3'
+```
+
+Debe listar `libwebkit2gtk-4.1.so.0` y `libgtk-3.so.0`.
+
+Al arrancar, la app imprime en consola:
+
+```text
+LyricsSync Translator starting on 127.0.0.1:8090
+Database ready at ~/.lyricsync/cache.db
+Server listening on 127.0.0.1:8090
+App started — launching server
+```
+
+API viva:
+
+```bash
+curl -s http://127.0.0.1:8090/api/now-playing
+```
+
+Cierre limpio: cerrar con la X de la ventana debe terminar el proceso al instante, imprimir `Shutting down...` y `Shutdown complete`, y `pgrep -af 'playerctl --follow'` no debe devolver nada (el follower no debe quedar huérfano).
 
 ## Build — Solo backend (desarrollo rápido)
 
@@ -94,9 +173,12 @@ go test ./...          # tests unitarios + de integración (sin red)
 go test -short ./...   # salta los tests que llaman APIs externas
 ```
 
-- `internal/api` — `inflightSet` (dedupe de resoluciones en vuelo): concurrencia, add/remove.
+- `internal/api` — `inflightSet` (dedupe de resoluciones en vuelo), apagado (broker SSE y `Shutdown` con un stream SSE abierto) y el estado de fullscreen reportado por la UI (`GET`/`PUT /api/window/fullscreen`).
+- `internal/player` — ciclo de vida de `playerctl --follow`: al cancelar el contexto el proceso hijo muere y los canales se cierran.
 - `internal/lyrics` — fallback chain (error vs. not-found, orden de providers) y cliente lrcmux.
 - El test `TestLrcMux_RealAPI` hace llamadas reales a `https://api.lrcmux.dev` y se omite con `-short`.
+
+Recomendado: `go test ./... -race` — los tests de concurrencia y apagado se escribieron para pasar con el detector de carreras.
 
 ## Arquitectura
 
@@ -220,6 +302,8 @@ El toggle **Karaoke** (Settings) activa/desactiva el karaoke completo. Cuando es
 | GET | `/api/config` | Configuración actual (API keys sanitizadas) |
 | PUT | `/api/config` | Actualizar `target_lang` y/o `translation_enabled` |
 | PUT | `/api/config/provider` | Actualizar API key de provider + hot-reload |
+| GET | `/api/window/fullscreen` | Último estado de fullscreen reportado por la UI |
+| PUT | `/api/window/fullscreen` | Reportar fullscreen `{fullscreen}`; el cierre de ventana guarda este valor |
 
 ## Eventos SSE
 
@@ -264,6 +348,16 @@ lyricsync-translator/
 └── config.yaml
 ```
 
+## Cierre de la app (shutdown)
+
+Cuando cerrás la ventana con la X, la app no se va de golpe: hace un apagado ordenado antes de terminar el proceso.
+
+- Se detiene el broker SSE y se cierran los streams abiertos, para que el servidor HTTP pueda drenar; el drenaje tiene timeout de 5 s y después fuerza `Close()`.
+- Se cierra la base SQLite.
+- Se mata el proceso hijo `playerctl --follow` (cancelando su contexto), así que no quedan procesos huérfanos.
+- Se guarda posición, tamaño y fullscreen de la ventana en `~/.lyricsync/window-state.yaml`.
+- El fullscreen se toma del último estado reportado por la UI (`PUT /api/window/fullscreen`), no se lee de GTK: Wails ejecuta el callback de cierre en otra goroutine y su getter de fullscreen no es seguro fuera del hilo principal. Consecuencia: si cambiás fullscreen por fuera de la app (por ejemplo desde el window manager), ese cambio no se persiste.
+
 ## Features
 
 - **App nativa**: empaquetado Wails v2, single binary, sin navegador
@@ -290,4 +384,5 @@ lyricsync-translator/
 - SSE con replay de estado al reconectar + merge atómico de traducciones
 - Cache SQLite de canciones y traducciones
 - Persistencia de estado de ventana (posición, tamaño, fullscreen)
+  El fullscreen se guarda desde el flag que reporta la UI (`PUT /api/window/fullscreen`), no leyendo el estado de GTK: Wails ejecuta `OnBeforeClose` en otra goroutine y su getter de fullscreen no es seguro fuera del hilo principal.
 - Docker: multi-stage build, LibreTranslate incluido
