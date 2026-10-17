@@ -8,11 +8,11 @@ import (
 
 // Tracker combines MPRIS channels into a coherent state and emits events.
 type Tracker struct {
-	currentTrack  *TrackInfo
-	status        PlayerStatus
-	positionMs    int64
-	activePlayer  string
-	playerctl     string
+	currentTrack *TrackInfo
+	status       PlayerStatus
+	positionMs   int64
+	activePlayer string
+	playerctl    string
 }
 
 // TrackerEvent is a JSON-serializable update sent to SSE clients.
@@ -36,9 +36,10 @@ func NewTracker(playerctlPath string) *Tracker {
 func (t *Tracker) Events(ctx context.Context) <-chan []byte {
 	out := make(chan []byte, 64)
 
-	trackCh, statusCh, posCh, err := Start(t.playerctl, &t.activePlayer)
+	trackCh, statusCh, posCh, err := Start(ctx, t.playerctl, &t.activePlayer)
 	if err != nil {
 		go func() {
+			defer close(out)
 			msg, _ := json.Marshal(TrackerEvent{
 				Type:      "status",
 				Status:    StatusNoPlayer.String(),
