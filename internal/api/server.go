@@ -10,6 +10,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -35,6 +36,8 @@ type Server struct {
 	lastTrackPayload        []byte
 	lastLyricsPayload       []byte
 	lastTranslationsPayload []byte
+	windowMu                sync.RWMutex // guards windowFullscreen
+	windowFullscreen        bool
 }
 
 func NewServer(
@@ -137,6 +140,8 @@ func NewServer(
 	r.Get("/api/player/shuffle", s.handleGetShuffle)
 	r.Post("/api/player/loop", s.handleLoop)
 	r.Get("/api/player/loop", s.handleGetLoop)
+	r.Get("/api/window/fullscreen", s.handleGetWindowFullscreen)
+	r.Put("/api/window/fullscreen", s.handleSetWindowFullscreen)
 
 	return s
 }

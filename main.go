@@ -167,14 +167,17 @@ func main() {
 		OnBeforeClose: func(ctx context.Context) bool {
 			x, y := runtime.WindowGetPosition(ctx)
 			w, h := runtime.WindowGetSize(ctx)
-			isFullscreen := runtime.WindowIsFullscreen(ctx)
 
+			// Read fullscreen from the state the UI reported instead of calling
+			// runtime.WindowIsFullscreen: Wails runs OnBeforeClose on a separate
+			// goroutine, and on Linux that getter reads GDK state directly from
+			// the GTK widget, which is not safe off the main thread.
 			wc := &config.WindowConfig{
 				X:          x,
 				Y:          y,
 				Width:      w,
 				Height:     h,
-				Fullscreen: isFullscreen,
+				Fullscreen: srv.WindowFullscreen(),
 			}
 			if err := config.SaveWindowState(wc); err != nil {
 				log.Printf("Could not save window state: %v", err)

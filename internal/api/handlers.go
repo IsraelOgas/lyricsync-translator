@@ -251,3 +251,47 @@ func (s *Server) handleUpdateProvider(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte(`{"ok":true}`))
 }
+
+// WindowFullscreen reports the last fullscreen state reported by the UI.
+//
+// The close handler persists this value instead of querying the window: on
+// Linux, Wails calls OnBeforeClose from a goroutine and its fullscreen getter
+// reads GDK state directly, which is not safe off the GTK main thread.
+func (s *Server) WindowFullscreen() bool {
+	s.windowMu.RLock()
+	defer s.windowMu.RUnlock()
+	return s.windowFullscreen
+}
+
+// setWindowFullscreen records the fullscreen state.
+func (s *Server) setWindowFullscreen(fullscreen bool) {
+	s.windowMu.Lock()
+	defer s.windowMu.Unlock()
+	s.windowFullscreen = fullscreen
+}
+
+// handleGetWindowFullscreen serves GET /api/window/fullscreen.
+func (s *Server) handleGetWindowFullscreen(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]bool{"fullscreen": s.WindowFullscreen()})
+}
+
+// handleSetWindowFullscreen serves PUT /api/window/fullscreen with a JSON body
+// of {"fullscreen": bool}. The UI reports cinema mode changes here so the close
+// handler knows the state without touching the window from another thread.
+func (s *Server) handleSetWindowFullscreen(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Fullscreen *bool `json:"fullscreen"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, `{"error":"invalid json"}`, http.StatusBadRequest)
+		return
+	}
+	if body.Fullscreen == nil {
+		http.Error(w, `{"error":"fullscreen is required"}`, http.StatusBadRequest)
+		return
+	}
+	s.setWindowFullscreen(*body.Fullscreen)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]bool{"fullscreen": s.WindowFullscreen()})
+}
